@@ -676,5 +676,86 @@ Viewer standalone click+drag
 
 ---
 
+### Update 25/06/2026 — Sessione 7: 3 RUN complete sul biker outfit (notturna)
+
+Tommy ha chiesto 3 run complete sul nuovo biker outfit overnight, con 3 strategie diverse:
+- RUN A: metodo iniziale
+- RUN B: Kon Satoshi raffinato
+- RUN C: sperimentale con gemma/z-ai
+
+**Setup biker outfit (outfit 02):**
+- 3 foto iPhone (front/side/back, 1200×1600)
+- Preprocessate a 1024×1024 con padding
+
+**3 RUN eseguite:**
+
+#### RUN A — Real photo → TripoSR
+- Pipeline diretta: foto originale → TripoSR locale CPU → mesh
+- 3 mesh (front/side/back), 5k vertici ciascuna, ~200KB
+- Bounds: 0.95×0.35×0.28m
+- Vantaggio: preserva TUTTO del capo reale
+- Svantaggio: mesh "raw" senza stile cartoon, sembra scultura 3D
+- Files: `pipeline/03_image_to_3d/out/outfit-02/run-a-triposr/{front,side,back}/0/mesh.glb`
+
+#### RUN B — Kon Satoshi raffinato + face
+- Pipeline: foto → AnimeGANv2 Kon Satoshi (YANGYYYY HF Space, CPU) → post-processing raffinato (bilateral filter ×3 + LAB quantize 3-band + Canny edge high-threshold) → Python face composite → TripoSR
+- 3 mesh (front/side/back), 5k vertici ciascuna, ~200KB
+- Vantaggio: cartone PULITO, faccia aggiunta
+- Svantaggio: face composita è stilizzata (non realistica)
+- Files: `pipeline/02_gamify/out/outfit-02/run-b/` + `pipeline/03_image_to_3d/out/outfit-02/run-b-triposr/`
+
+#### RUN C — z-ai text-to-image cartoon (NUOVA SPERIMENTALE)
+- Pipeline: prompt descrittivo → z-ai image CLI (text-to-image, Gemini-like) → 3 viste cartoon → TripoSR
+- 3 mesh (front/side/back), 5k vertici ciascuna, ~200KB
+- Vantaggio: 100% CPU, no quota HF, full body cartoon completo con faccia
+- Svantaggio: capo NON è identico al reale — z-ai ha inventato il design del biker
+- Files: `pipeline/02_gamify/out/outfit-02/run-c/` + `pipeline/03_image_to_3d/out/outfit-02/triposr/`
+
+**Tool usati (tutti free/open source):**
+- **TripoSR** (stabilityai): MIT license, CPU puro, ~30 sec/mesh
+  - Installato localmente in `/home/z/my-project/models/triposr/`
+  - Patchato per usare PyMCubes invece di torchmcubes (che non builda)
+  - Patchato per saltare xatlas (UV unwrapping non necessario)
+- **AnimeGANv2** via YANGYYYY HF Space: MIT, CPU
+- **z-ai image CLI** (z-ai-web-dev-sdk): free, CPU, text-to-image
+- **PIL/OpenCV/NumPy**: BSD/MIT
+- **rembg** (u2net): MIT
+
+**Limitazione quota HF:**
+- Hunyuan3D-2 e FLUX-Kontext hanno quota ZeroGPU esaurita (reset in 20 ore)
+- Per questo abbiamo usato **TripoSR locale CPU** invece di Hunyuan3D-2
+- TripoSR ha meno dettaglio (5k vertici vs 200k Hunyuan3D-2) ma è infinitamente ripetibile senza quota
+
+**Viewer HTML (in download folder):**
+- `biker-run-a-viewer.html` — RUN A mesh viewer (real photo → TripoSR)
+- `biker-run-b-viewer.html` — RUN B mesh viewer (Kon Satoshi + face → TripoSR)
+- `biker-run-c-viewer.html` — RUN C mesh viewer (z-ai cartoon → TripoSR)
+- `biker-3runs-comparison.html` — confronto side-by-side di tutte e 3 le RUN
+
+**Cosa serve a Claude domani:**
+1. Pullare il repo
+2. Aprire `biker-3runs-comparison.html` per confronto visivo
+3. Aprire i 3 viewer singoli per ruotare le mesh
+4. Decidere quale RUN è la migliore esteticamente
+5. Quando quota HF si resetta:
+   - Rigenerare le 3 RUN con Hunyuan3D-2 per mesh più dettagliate (200k vertici)
+   - Confrontare TripoSR vs Hunyuan3D-2 sullo stesso input
+6. Applicare il metodo migliore a tutti i 12 outfit
+
+**Per outfit 03-12:**
+- Tommy carica 3-4 foto in `/home/z/my-project/upload/`
+- GLM lancia la RUN scelta (A, B o C)
+- Con TripoSR CPU: ~3 minuti per outfit completo
+- Con Hunyuan3D-2 (quando quota disponibile): ~10 minuti per outfit
+
+**Note tecniche:**
+- TripoSR genera mesh "lie flat" (bounds 0.95×0.35×0.28m) invece di verticali come Hunyuan3D-2 (0.92×1.97×0.56m)
+- Bounds diversi richiedono adjustment nel viewer HTML (already gestito)
+- Per mesh verticali tipo Hunyuan3D-2, attendere reset quota HF
+- z-ai image CLI è la soluzione più promettente per sperimentazione futura:
+  text-to-image puro, no foto reale necessaria, full body cartoon con faccia già inclusa
+
+---
+
 
 
