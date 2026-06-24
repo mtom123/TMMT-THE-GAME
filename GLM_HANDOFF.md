@@ -417,5 +417,68 @@ Tommy ha chiesto:
 
 ---
 
+### Update 24/06/2026 — Sessione 4: v2 con dettagli padded preservati
+
+Tommy ha fatto notare che v1 non preservava i dettagli del capo:
+- Pants: padded sides con linee imbottite (quilted stitching)
+- Shirt: padded side panels (fianchetta imbottita)
+- Shoulder: padded detail
+
+**v2 — Cosa è cambiato:**
+
+1. **Prompt chirurgico** per ogni vista, con menzione esplicita di:
+   - "PANTS padded quilted SIDES with horizontal stitching lines"
+   - "SHIRT padded side panels (fianchetta imbottita)"
+   - "SHOULDER padded detail with quilted stitching"
+   - Istruzione: "draw quilted stitching lines as distinct dark lines"
+
+2. **4 foto originali come input** (non solo front):
+   - v1 usava solo front → generava back/left/right con prompt
+   - v2 usa ogni foto originale per la sua vista
+   - Più fedeltà alla forma reale del capo
+
+3. **Parametri più alti**:
+   - guidance_scale 3.0 (vs 2.5) → più prompt adherence
+   - steps 35 (vs 28) → più qualità
+
+4. **Hunyuan3D-2 high-res**:
+   - octree_resolution 384 (vs 256) → più dettaglio mesh
+   - steps 50 (vs 30) → più qualità
+   - Mesh risultante: 185k vertici, 656k facce (vs 79k/275k di v1) — 2.3× più dettaglio
+
+**Asset generati v2:**
+- `pipeline/02_gamify/out/outfit-01/01-front-gamified-v2.png` (47KB)
+- `pipeline/02_gamify/out/outfit-01/01-back-gamified-v2.png` (35KB)
+- `pipeline/02_gamify/out/outfit-01/01-side-gamified-v2.png` (fallback: = v1 left)
+- `pipeline/02_gamify/out/outfit-01/01-right-gamified-v2.png` (mirror di v1 left)
+- `pipeline/03_image_to_3d/out/outfit-01/multi-view/avatar-v2-highres.glb` (9.8MB, 185k verts)
+
+**Viewer:**
+- `/home/z/my-project/download/avatar-viewer-v2.html` (13MB) — v2 high-detail
+- `/home/z/my-project/download/avatar-viewer.html` (5.5MB) — v1 per confronto
+- `/home/z/my-project/download/comparison-v1-v2.html` — confronto side-by-side
+
+**Limitazione quota HF:**
+- ZeroGPU quota esaurita dopo 2 chiamate FLUX-Kontext v2 (front + back)
+- Side v2 e right v2 non sono state generate da FLUX
+- Workaround: side v2 = v1 left (fallback), right v2 = mirror di v1 left
+- Quando quota si resetta (22 ore) possiamo rifare side v2 con prompt dettagliato
+
+**Modelli confermati open source:**
+- **FLUX.1-Kontext-Dev**: open weights, licenza non-commercial (free, anche per ricerca/sviluppo)
+- **Hunyuan3D-2**: Apache 2.0 (completamente libero, anche commerciale)
+- Entrambi utilizzabili per il progetto TMMT
+
+**Cosa serve a Claude domani:**
+- Confrontare v1 vs v2 (aprire `comparison-v1-v2.html`)
+- Verificare se i dettagli padded sono visibili nella v2
+- Se servono più dettagli: usare GPU locale per:
+  - Rigenerare side v2 con prompt dettagliato
+  - Aggiungere ControlNet Canny/Lineart per preservare ancora meglio i dettagli del capo
+  - Provare InstantStyle con reference JSR mirate per dettagli padded
+- Importare v2 in Blender, separare capo da manichino, decimate, naming convention
+
+---
+
 
 
