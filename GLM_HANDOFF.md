@@ -564,5 +564,117 @@ Viewer standalone click+drag
 
 ---
 
+### Update 24/06/2026 — Sessione 6: v1.1 FINAL con Kon Satoshi + faccia
+
+Tommy ha segnalato che v3 (Canny + LAB quantize) era troppo rumoroso — sembrava filtro Instagram, non cartone.
+
+**Diagnosi:** Canny edge detection cattura OGNI micro-gradient (tessitura, rumore sensore) → outline neri ovunque → rumore visivo.
+
+**Soluzione v1.1: 3 step, tutti free/CPU**
+
+#### Step 1 — Cartoonify AnimeGANv2 Kon Satoshi
+Via `YANGYYYY/cartoonize` HF Space (CPU, free, no quota):
+- AnimeGANv2 è una rete neurale addestrata su fumetti di Kon Satoshi
+- Output pulito: linee semantiche (non edge detection), colori piatti
+- 3 stili testati: Hayao (Ghibli), Shinkai, Kon Satoshi
+- Kon Satoshi è il piu pulito oggettivamente (L_laplacian 5 vs 18 di Hayao)
+- Post-processing: bilateral filter + LAB saturazione ×1.3 + unsharp mask
+- Script: `pipeline/02_gamify/scripts/cartoonify_v11.py`
+
+#### Step 2 — Aggiunta faccia via Python compositing (CPU)
+Perche' le foto originali croppano la testa:
+- Rilevazione spalle via brightness median (body in 45% dell'altezza)
+- Composito testa anime stilizzata sopra le spalle:
+  - Ovale faccia con skin tone warm
+  - Capelli neri con highlight cel-shaded
+  - Occhi con pupils + highlights
+  - Sopracciglia + naso + bocca minimal
+  - Outline neri netti (cel-shaded)
+- Palette matching con corpo
+- Script: `pipeline/02_gamify/scripts/add_face_python.py`
+- Output: `01-front-with-face-v11.png` (500KB)
+
+#### Step 3 — Hunyuan3D-2 multi-view
+4 viste Kon Satoshi → 1 mesh GLB:
+- octree_resolution=384, steps=50
+- Output: 203k vertici, 726k facce
+- Bounds: 0.92 × 1.97 × 0.56 m (figura umana verticale coerente)
+- File: `pipeline/03_image_to_3d/out/outfit-01/multi-view/avatar-v11-kon-satoshi.glb`
+
+**Asset v1.1 generati:**
+- `pipeline/02_gamify/scripts/cartoonify_v11.py` (CLI, 3 stili)
+- `pipeline/02_gamify/scripts/add_face_python.py` (face composite CPU)
+- `pipeline/02_gamify/out/outfit-01/v11/01-front-cartoon-v11-kon.png` (605KB)
+- `pipeline/02_gamify/out/outfit-01/v11/01-side-cartoon-v11-kon.png` (570KB)
+- `pipeline/02_gamify/out/outfit-01/v11/01-back-cartoon-v11-kon.png` (585KB)
+- `pipeline/02_gamify/out/outfit-01/v11/01-detail-cartoon-v11-kon.png` (714KB)
+- `pipeline/02_gamify/out/outfit-01/v11/01-front-with-face-v11.png` (500KB)
+- `pipeline/03_image_to_3d/out/outfit-01/multi-view/avatar-v11-kon-satoshi.glb` (10.9MB, 203k vertici)
+
+**Viewer HTML (in download folder):**
+- `avatar-viewer-v11.html` (14.5MB) — v1.1 FINAL con Kon Satoshi + faccia
+- `comparison-v3-v11.html` — confronto side-by-side v3 vs v1.1
+
+**Modelli confermati free / open source:**
+- **AnimeGANv2** (Kon Satoshi weights): MIT/permissive
+- **Hunyuan3D-2**: Apache 2.0 (libero anche commerciale)
+- **YANGYYYY/cartoonize HF Space**: free, CPU
+- **PIL/OpenCV/NumPy**: BSD/MIT
+- **FLUX.1-Kontext-Dev**: open weights, non-commercial
+- **BAGEL**: Apache 2.0
+- **IDM-VTON** (backup): CC-BY-NC-SA-4.0
+
+**Pipeline FINALE v1.1 (production-ready):**
+```
+4 foto iPhone originali
+    ↓ preprocess v2 (padding 1024×1024)
+4 foto padded
+    ↓ AnimeGANv2 Kon Satoshi via YANGYYYY HF Space (CPU, 4 min)
+4 viste cartoon pulite
+    ↓ Python face composite (CPU, 1 sec)
+4 viste cartoon con faccia
+    ↓ Hunyuan3D-2 multi-view (1 chiamata, 5 min)
+1 mesh GLB 203k vertici
+    ↓ embed base64 in HTML
+Viewer standalone click+drag
+```
+
+**Tempo totale per outfit: ~10 minuti** (vs 30+ min v1/v2 con quota HF)
+
+**Confronto finale versioni:**
+| Ver | Tecnica | Vertici | Pulizia | Faccia | Tempo |
+|-----|---------|---------|---------|--------|-------|
+| v1  | FLUX generic | 79k | Media | No | 30+ min |
+| v2  | FLUX detailed | 185k | Media | No | 30+ min |
+| v3  | Canny + LAB | 317k | Bassa (rumoroso) | No | 5 min |
+| v1.1 | Kon Satoshi + Python face | 203k | Alta (pulito) | Sì | 10 min |
+
+**Cosa serve a Claude domani (con GPU NVIDIA locale):**
+1. Pullare il repo
+2. Aprire `comparison-v3-v11.html` per confronto visivo v3 vs v1.1
+3. Aprire `avatar-viewer-v11.html` per vedere la mesh 203k vertici
+4. Importare `avatar-v11-kon-satoshi.glb` in Blender (stadio 4)
+5. Cleanup: decimate da 203k → 30-50k vertici
+6. Separare capo da manichino
+7. Naming convention (mesh_nylon_*, mesh_denim_*, etc.)
+8. Export GLB via blender_export.py
+9. Salvare in `web/assets/looks/01-outfit-one.glb`
+
+**Per outfit 02-12:**
+- Tommy carica 4 foto in `/home/z/my-project/upload/`
+- GLM lancia `cartoonify_v11.py --style kon` su tutte e 4
+- GLM lancia `add_face_python.py` sul front
+- GLM lancia Hunyuan3D-2 (1 chiamata per outfit, 5 min)
+- GLM genera viewer HTML
+- ~10 minuti totali per outfit completo
+
+**Note:**
+- La faccia composita via Python è stilizzata ma non "perfetta" — per outfit 02-12 possiamo
+  raffinarla. Con GPU locale Claude può usare Stable Diffusion inpainting per facce piu realistiche.
+- La faccia attuale è su front view soltanto. Per back/side/detail non serve (sono viste posteriori/laterali).
+- La mesh e' orientata verticalmente (Y-up),_bounds coerenti con figura umana in piedi.
+
+---
+
 
 
