@@ -255,3 +255,79 @@ stessa qualità, zero installazione.
 - GLM rilancia `preprocess.py` + `to3d_hf.py`
 - Stesso flusso, ~25 minuti per outfit
 
+---
+
+### Update 24/06/2026 — Sessione 2: image-to-image research + pipeline orchestrator
+
+Tommy ha chiesto:
+1. Preview delle 4 mesh già generate ✅ (`download/mesh-preview.html`)
+2. Verifica quanti input accetta Hunyuan3D-2 → **5 input** (1 image + 4 multi-view)
+3. Deep research image-to-image OS per gamificazione ✅
+4. Test diversi modelli sullo stesso capo ✅ (parziale)
+5. Fermarsi per spostarsi su computer con NVIDIA
+
+**Cosa è stato fatto:**
+
+1. **Preview mesh**: `download/mesh-preview.html` — visore 3D per le 4 mesh
+   GLB di outfit-01 (front/side/back/detail). Auto-rotate, switch 1-4, wireframe W.
+
+2. **Hunyuan3D-2 input check**: API ispezionata, confermato 5 input immagini:
+   - `image` (principale)
+   - `mv_image_front`, `mv_image_back`, `mv_image_left`, `mv_image_right` (multi-view)
+   → Ha senso generare 4 viste gamified prima di passare al 3D.
+
+3. **Deep research img2img OS**: top 5 candidates identificati:
+   - `black-forest-labs/FLUX.1-Kontext-Dev` (non-commercial, best fidelity)
+   - `InstantX/InstantStyle` (Apache-2.0, style transfer con reference)
+   - `ByteDance-Seed/BAGEL` (Apache-2.0, instruction-based)
+   - `akhaliq/AnimeGANv2` (one-click anime)
+   - `timbrooks/instruct-pix2pix` (classic)
+   Report completo: `/home/z/my-project/tool-results/img2img-os-research.md`
+
+4. **Test A/B**: 2 modelli testati con successo su outfit-01/front:
+   - `test-2-flux-kontext-attempt1.png` (1024×1024, 66KB) ← MIGLIORE
+   - `test-4-animeganv2-version1.png` (512×512, 12KB)
+   Gli altri (InstantStyle, BAGEL, AnimeGANv2 v2) sono falliti per
+   ZeroGPU quota di HF Spaces.
+
+5. **Pipeline orchestrator**: `pipeline/pipeline.py` — script unico che fa:
+   - Stage 0 INGEST: copia da `/home/z/my-project/upload/` a `pipeline/01_capture/raw/NN/`
+   - Stage 1 PREPROCESS: 1024×1024 PNG, EXIF stripped
+   - Stage 2 GAMIFY: image-to-image con modello selezionabile
+     (`--model flux-kontext|instantstyle|bagel|animeganv2`)
+   - Stage 3 MESH: Hunyuan3D-2 → GLB
+   Uso: `python pipeline.py --outfit 01 [--stage all|ingest|preprocess|gamify|mesh] [--model XXX]`
+
+6. **Documentazione**:
+   - `GUIDA_TOMMY.md`: istruzioni step-by-step per Tommy (dove mettere le foto, come lanciare)
+   - `download/gamify-test-preview.html`: mock HTML per confrontare i 2 test gamified
+   - Struttura cartelle per 12 outfit creata in `pipeline/01_capture/raw/` e `processed/`
+
+**Problemi aperti identificati:**
+1. **Crop quadrato**: FLUX-Kontext croppa a 1024×1024 perdendo persona intera
+   (teste/piedi tagliati). Da fixare con padding o aspect ratio verticale.
+2. **Manca avatar/persona**: le foto di dettaglio del capo non hanno viso.
+   Per il gioco serve un personaggio TMMT che indossi i capi.
+3. **HF Spaces quota**: senza GPU locale, limitati a ~90s/6h di ZeroGPU.
+   Per batchare 12 outfit serve GPU locale.
+
+**Cosa serve a GLM quando Tommy attiva GPU locale:**
+- Avviso che siamo su computer con NVIDIA
+- Verifica `nvidia-smi` + `torch.cuda.is_available()` per confermare
+- A quel punto GLM installa dipendenze locali (torch+cuda, diffusers, etc.)
+  e runna i modelli in locale senza quota HF
+
+**Stato pipeline:**
+```
+[INGEST]      ✅ Script pronto (pipeline/pipeline.py)
+[PREPROCESS]  ✅ Script pronto
+[GAMIFY]      ⚠️  Funziona ma quota HF limita (1-2 foto per sessione)
+                - FLUX-Kontext: ✓ better quality (non-commercial)
+                - AnimeGANv2: ✓ one-click (research only)
+                - InstantStyle, BAGEL: bloccati da quota
+[MESH]        ✅ Hunyuan3D-2 testato su outfit-01 (4 mesh GLB generate)
+                - Funziona bene anche con single-image
+                - Con 4 viste gamified sarà ancora meglio
+```
+
+
