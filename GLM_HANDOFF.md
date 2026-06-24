@@ -320,14 +320,102 @@ Tommy ha chiesto:
 **Stato pipeline:**
 ```
 [INGEST]      ✅ Script pronto (pipeline/pipeline.py)
-[PREPROCESS]  ✅ Script pronto
-[GAMIFY]      ⚠️  Funziona ma quota HF limita (1-2 foto per sessione)
-                - FLUX-Kontext: ✓ better quality (non-commercial)
-                - AnimeGANv2: ✓ one-click (research only)
-                - InstantStyle, BAGEL: bloccati da quota
-[MESH]        ✅ Hunyuan3D-2 testato su outfit-01 (4 mesh GLB generate)
-                - Funziona bene anche con single-image
-                - Con 4 viste gamified sarà ancora meglio
+[PREPROCESS]  ✅ Script pronto (PADDING no-crop, persona intera)
+[GAMIFY]      ✅ FUNZIONA CON HF TOKEN di Tommy (hf_EIP...!)
+                - FLUX-Kontext: ✓ better quality, 4 viste avatar generate
+                - Avatar front → back/left/right generati con prompt "same character rotated"
+[MESH]        ✅ Hunyuan3D-2 MULTI-VIEW testato su outfit-01
+                - 4 viste gamified → 1 mesh GLB unica (79k verts, 275k faces)
+                - Bounds: 0.76 × 1.96 × 0.51 → figura umana verticale coerente
+                - File: pipeline/03_image_to_3d/out/outfit-01/multi-view/avatar-multiview0.glb
+[VIEWER]      ✅ HTML standalone con click+drag + base64 GLB embedded
+                - /home/z/my-project/download/avatar-viewer.html (5.5MB)
+                - Apribile via file:// double-click
+                - Hotkey: drag orbita · scroll zoom · W wireframe · A auto-rotate · H hide UI
 ```
+
+---
+
+### Update 24/06/2026 — Sessione 3: PIPELINE END-TO-END COMPLETA su outfit-01
+
+**Tommy ha fornito HF token (hf_EIP...)** → quota ZeroGPU sbloccata!
+
+**Pipeline completa eseguita con successo:**
+
+1. **Preprocess v2** (no crop, padding)
+   - 4 foto iPhone 3024×4032 → 4 PNG 1024×1024 con padding grigio neutro
+   - Persona/capo PRESERVATO intero (no taglio testa/piedi)
+   - Script: `/home/z/my-project/scripts/preprocess_v2.py`
+
+2. **FLUX-Kontext call 1** — Avatar FRONT
+   - Input: foto originale front
+   - Prompt: "Redraw as cel-shaded anime character in JSR style, ADD face/head, preserve outfit EXACTLY"
+   - Output: `01-front-gamified.png` (41KB)
+   - L'avatar ha ora viso + outfit preservato
+
+3. **FLUX-Kontext calls 2-4** — Viste back/left/right
+   - Input: avatar front generato
+   - Prompt: "Show same character from [BACK/LEFT/RIGHT] view, same outfit, same colors, same details"
+   - Output: `01-back-gamified.png` (32KB), `01-left-gamified.png` (30KB), `01-right-gamified.png` (31KB)
+   - 4 viste coerenti dell'avatar completo
+
+4. **Hunyuan3D-2 MULTI-VIEW** — 4 viste → 1 mesh
+   - Input: 4 viste gamified (front/back/left/right)
+   - Endpoint: `/shape_generation` con `mv_image_front/back/left/right` popolati
+   - Output: `avatar-multiview0.glb` (4.1MB, 79k vertici, 275k facce)
+   - Bounds: 0.76 × 1.96 × 0.51 metri → figura umana verticale COERENTE
+   - File: `pipeline/03_image_to_3d/out/outfit-01/multi-view/avatar-multiview0.glb`
+
+5. **HTML Viewer standalone**
+   - File: `/home/z/my-project/download/avatar-viewer.html` (5.5MB)
+   - GLB embedded come base64 (funziona via file:// double-click)
+   - Click+drag orbita, scroll zoom, W wireframe, A auto-rotate, H hide UI
+   - 4 thumbnail delle viste gamified in UI laterale
+   - Testato via browser headless: 256k pixel non-neri → mesh visibile
+
+**Cosa serve a Claude domani (con GPU NVIDIA locale):**
+
+1. **Pullare il repo** (`git pull --rebase origin main`)
+2. **Ispezionare** `/home/z/my-project/download/avatar-viewer.html` per vedere la mesh
+3. **Importare** `pipeline/03_image_to_3d/out/outfit-01/multi-view/avatar-multiview0.glb`
+   in Blender (stadio 4)
+4. **Cleanup**:
+   - Decimate da 79k → 20-30k vertici
+   - Verificare orientation (Y-up,figura verticale)
+   - Separare eventuali parti non necessarie
+5. **Naming convention** (per AtelierLoader):
+   - `mesh_skin_mannequin` (corpo)
+   - `mesh_nylon_*` / `mesh_denim_*` / `mesh_fur_*` / `mesh_laser_*` (capi)
+6. **Export** via `pipeline/04_blender/blender_export.py`
+7. **Salvare** in `web/assets/looks/01-outfit-one.glb`
+8. GLM aggiornerà `LOOKS` registry in `web/standalone.html`
+
+**Con GPU NVIDIA locale, Claude potrà anche:**
+- Runnare FLUX-Kontext localmente (no HF quota, no rate limit)
+- Generare tutti i 12 outfit in batch (~30 min/outfit × 12 = 6 ore totali)
+- Sperimentare con InstantStyle + reference JSR mirate
+- Provare BAGEL per alternative
+- Aggiungere ControlNet per garment preservation ancora più preciso
+
+**Asset generati in questa sessione (tutti su GitHub):**
+- `pipeline/01_capture/raw/01/01-{front,side,back,detail}.jpg` (originali)
+- `pipeline/01_capture/processed/01/01-{front,side,back,detail}.png` (1024² padded)
+- `pipeline/02_gamify/out/outfit-01/01-{front,back,left,right}-gamified.png` (avatar 4 viste)
+- `pipeline/03_image_to_3d/out/outfit-01/multi-view/avatar-multiview0.glb` (mesh 79k vertici)
+- `/home/z/my-project/download/avatar-viewer.html` (viewer standalone 5.5MB)
+
+**Token HF da riutilizzare:**
+- Token HF fornito da Tommy (utente tommasoooo7), non committato per security
+- Read-only, può essere configurato come env var `HF_TOKEN` per script locali
+- Tommy ce lo fornisce di nuovo quando serve
+
+**Prossimi step dopo Claude (con GPU locale):**
+- Processare outfit 02-12 con stessa pipeline
+- Validare stylistic coherence tra i 12 avatar
+- Iniziare stadio 4 (Blender) per tutti i 12
+- Costruire la scena 3D finale con tutti i capi in `web/standalone.html`
+
+---
+
 
 
