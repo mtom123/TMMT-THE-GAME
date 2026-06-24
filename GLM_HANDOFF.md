@@ -149,3 +149,54 @@ Creato `PAT_SETUP.md` alla root del repo con guida step-by-step per Tommy
 - Verificato che la PAT ha scope corretto (Contents: Read/Write su TMMT-THE-GAME).
 - Repo è pubblico quindi fetch/push funzionanti.
 
+---
+
+### Verdetto Claude (24 Giugno 2026, post-review commit f756b35)
+
+> "Lavoro solido e coerente con l'architettura."
+
+**Approvazioni:**
+- ✅ T1 (web app): approvato così com'è
+- ✅ T2 (Blender export): approvato così com'è
+
+**3 decisioni prese da Claude:**
+
+1. **Fix minore tecnico su Blender export**: il flag meshopt
+   nell'export Blender nativo è di fatto gestito dal post-process
+   gltf-transform (Blender nativo fa solo Draco, non Meshopt).
+   → GLM ha fixato `blender_export.py` rimuovendo
+   `export_mesh_extension: True` (era in realtà Draco, non Meshopt)
+   e aggiunto `export_draco_mesh_compression_enable: False` con
+   commento esplicito. Aggiornato anche `BLENDER.md` con sezione
+   "Compression" corretta.
+
+2. **Multi-mesh per outfit**: un **unico GLB per outfit** con dentro
+   tutte le mesh nominate (vest, pantaloni, manichino). È esattamente
+   come AtelierLoader già lavora (un look = un GLB = una `loadLook()`).
+   NON file separati per capo. GLM ha aggiunto sezione esplicita
+   "Struttura GLB: UN file per outfit (multi-mesh)" in `BLENDER.md`.
+
+3. **T3 (garment-*.js deprecati)**: tenere come **reference silhouette**,
+   non rimuovere. L'istinto di GLM era giusto.
+   → GLM ha aggiunto header `// ⚠ DEPRECATED — REFERENCE ONLY`
+   in cima ai 3 file `garment-bulk-shirt.js`, `garment-fur-coat.js`,
+   `garment-scarf-vest.js`. Le funzioni `createBulkShirt()`,
+   `createFurCoat()`, `createScarfVest()` restano esportate e
+   sintatticamente valide (node --check OK) — utilizzabili se mai
+   servisse in futuro per reference visivo.
+   → Creato `glm work/README.md` con status completo di tutti i file
+   della cartella (cosa è production, cosa è prototipo, cosa è rotto).
+
+**Cosa serve da Claude in futuro:**
+- Niente per ora. Quando Claude avrà il primo GLB reale dallo stadio 4
+  (Blender), lo salva in `web/assets/looks/NN-slug.glb` e GLM aggiorna
+  la `LOOKS` registry in `web/index.html` e `web/standalone.html`.
+
+**Prossimi step GLM:**
+- Aspetta il primo GLB reale
+- Test in standalone.html
+- Validazione shader sui materiali reali (denim/nylon/laser/fur)
+- Iterazione sui parametri shader se la resa non convince Tommy
+
+**Stato complessivo**: pipeline END-TO-END pronta. Mancano solo i GLB
+reali dallo stadio 4 (Blender) per chiudere il cerchio.

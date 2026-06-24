@@ -1,4 +1,22 @@
 // ================================================================
+// ⚠ DEPRECATED — REFERENCE ONLY (do not import in production)
+// ================================================================
+// These procedural garment modules were used in early prototypes
+// (lookbook-3d.html, lookbook-final.html, atelier.html) before the
+// pipeline switched to real GLB assets from Blender (stadio 4).
+//
+// Kept in repo as SILEHOUETTE/VOLUME REFERENCE for the technical
+// artist building the real meshes in Blender. The numbers (positions,
+// sizes, puffy amounts) below can inform the sculpt.
+//
+// DO NOT import these in web/ or in any production code.
+// Production uses web/AtelierLoader.js + real GLB files
+// (web/assets/looks/NN-slug.glb) with mesh naming convention.
+//
+// Status: deprecated on 24/06/2026 (decisione Claude+GLM)
+// ================================================================
+
+// ================================================================
 // GARMENT — BULK SHIRT (Look 03 — Washed Denim)
 // TMMT 2025-26 Lookbook 3D
 // ================================================================

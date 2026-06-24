@@ -3,6 +3,19 @@
 > Da mesh grezza (stadio 3, image-to-3D) a `.glb` pulito e nominato
 > per il caricamento nel `web/AtelierLoader.js` (stadio 5).
 
+## Struttura GLB: UN file per outfit (multi-mesh)
+
+Ogni outfit (es. `02-scarf-vest`) è **un singolo file `.glb`** che contiene
+TUTTE le mesh dell'outfit nominate secondo la convenzione. Esempio per il
+Bulk Shirt: il file `02-bulk-shirt.glb` contiene 4 mesh
+(`mesh_skin_mannequin`, `mesh_denim_bulk_shirt_body`, `mesh_denim_bulk_shirt_sleeve_L`,
+`mesh_denim_bulk_shirt_sleeve_R`). AtelierLoader carica l'intero GLB, traversea
+le mesh, e applica lo shader corretto a ognuna in base al prefisso del nome.
+
+NON si esportano file separati per capo (es. `shirt.glb` + `pants.glb`):
+sarebbe incoerente con il modello di AtelierLoader (un look = un GLB = una
+loadLook() call).
+
 ## Workflow
 
 ```
@@ -11,7 +24,7 @@ mesh grezza (.obj/.glb da stadio 3)
     ↓ rename secondo convenzione
     ↓ (opzionale) Decimate per ridurre polycount
     ↓ export .glb via blender_export.py
-    ↓ (opzionale) gltf-transform post-process
+    ↓ (OBBLIGATORIO) gltf-transform post-process per Meshopt
 .glb finale (< 2 MB) → web/assets/looks/NN-slug.glb
 ```
 
@@ -110,17 +123,23 @@ blender --background input.blend \
    - ✓ UVs
    - ✓ Normals
    - ✓ Tangents
-   - Compression: **Meshopt** (EXT_meshopt_compression)
 3. Disattiva:
    - ✗ Cameras
    - ✗ Lights
+   - ✗ Compression (Draco) — NON usare Draco. La compressione Meshopt
+     viene applicata dopo, in post-process, da `gltf-transform`.
+     Blender nativo NON sa fare Meshopt, solo Draco.
 4. Click **Export glb**
+5. **OBBLIGATORIO**: dopo export, lanciare `gltf-transform` (vedi sotto)
+   per applicare EXT_meshopt_compression. Senza questo step, il GLB
+   sara non compresso e più grande del necessario.
 
-## Post-processing con gltf-transform (opzionale ma consigliato)
+## Post-processing con gltf-transform (OBBLIGATORIO, non opzionale)
 
-Lo script tenta automaticamente di lanciare `gltf-transform` per:
-- Comprimere ulteriormente la geometria con EXT_meshopt_compression
-- Convertire le texture in KTX2 (Basis Universal)
+Lo script `blender_export.py` lancia automaticamente `gltf-transform`
+per applicare la vera compressione richiesta dal loader web:
+- **EXT_meshopt_compression** sulla geometria (Blender non sa farla nativamente)
+- **KTX2 / Basis Universal** sulle texture (supercompressione)
 
 Installa prima:
 ```bash

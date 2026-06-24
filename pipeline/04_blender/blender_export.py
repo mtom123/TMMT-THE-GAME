@@ -49,6 +49,11 @@ FUR_PREFIX = 'mesh_fur_'
 MAX_EXPORT_SIZE_MB = 2.0  # warn if exceeded
 
 # GLB export settings (Blender 4.2+ uses glTF 2.0 exporter)
+# NOTE: Blender's native exporter does NOT do EXT_meshopt_compression
+# (only Draco). Meshopt compression is applied in the POST-PROCESS step
+# via gltf-transform (see post_process_glb below). The flag
+# `export_mesh_extension` in Blender refers to Draco, not Meshopt —
+# we leave it False and let gltf-transform handle compression cleanly.
 EXPORT_SETTINGS = {
     'export_format': 'GLB',
     'use_selection': False,
@@ -64,8 +69,9 @@ EXPORT_SETTINGS = {
     'export_skins': True,           # For skinned meshes if any
     'export_morph': False,
     'export_attributes': False,
-    'export_mesh_extension': True,  # Enable EXT_meshopt_compression
     'export_image_format': 'AUTO',
+    # Draco intentionally OFF — we use gltf-transform (Meshopt) in post
+    'export_draco_mesh_compression_enable': False,
 }
 
 
