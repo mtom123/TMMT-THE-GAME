@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atelier Sferico — TMMT Lookbook 3D</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #050505; color: #d4d4d4;
+      font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+    }
+    canvas { display: block; }
+
+    #ui {
+      position: fixed;
+      top: 28px; left: 28px;
+      z-index: 10;
+      max-width: 340px;
+      pointer-events: none;
+    }
+    #ui > * { pointer-events: auto; }
+
+    .brand {
+      font-size: 10px;
+      letter-spacing: 0.35em;
+      color: #555;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .title {
+      font-size: 14px;
+      letter-spacing: 0.05em;
+      color: #f5f5f5;
+      margin-bottom: 32px;
+      font-weight: 500;
+    }
+
+    .garment-info {
+      margin-bottom: 28px;
+      min-height: 130px;
+    }
+    .garment-code {
+      font-size: 9px;
+      letter-spacing: 0.3em;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .garment-name {
+      font-size: 22px;
+      letter-spacing: -0.01em;
+      color: #ffffff;
+      margin-bottom: 14px;
+      font-weight: 500;
+      line-height: 1.1;
+    }
+    .garment-desc {
+      font-size: 11px;
+      line-height: 1.7;
+      color: #888;
+      letter-spacing: 0.01em;
+    }
+
+    .garment-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .garment-btn {
+      background: transparent;
+      border: 1px solid #1f1f1f;
+      color: #888;
+      padding: 12px 16px;
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .garment-btn:hover { border-color: #444; color: #c4c4c4; background: rgba(255,255,255,0.02); }
+    .garment-btn.active { border-color: #f5f5f5; color: #ffffff; background: rgba(255,255,255,0.04); }
+    .garment-btn .num { font-size: 10px; color: #555; }
+    .garment-btn.active .num { color: #999; }
+
+    #info {
+      position: fixed;
+      bottom: 28px; left: 28px;
+      font-size: 9px;
+      color: #555;
+      letter-spacing: 0.1em;
+      line-height: 1.8;
+      text-transform: uppercase;
+    }
+    #info b { color: #999; font-weight: 500; }
+
+    #stats {
+      position: fixed;
+      bottom: 28px; right: 28px;
+      font-size: 9px;
+      color: #555;
+      text-align: right;
+      letter-spacing: 0.15em;
+    }
+
+    #vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%);
+      z-index: 5;
+    }
+
+    body { opacity: 0; transition: opacity 0.8s ease; }
+    body.loaded { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div class="brand">TMMT — Atelier Sferico</div>
+    <div class="title">Lookbook 3D / Test Estetico</div>
+
+    <div class="garment-info">
+      <div class="garment-code" id="garment-code">Look 03 — Washed Denim</div>
+      <div class="garment-name" id="garment-name">BULK SHIRT</div>
+      <div class="garment-desc" id="garment-desc">Boxy oversized silhouette. Hand-bleached washed denim. Drop shoulders, extended hem. Front welt pockets replace traditional chest pockets.</div>
+    </div>
+
+    <div class="garment-buttons">
+      <button class="garment-btn active" data-garment="bulk">
+        <span class="num">01</span><span>Bulk Shirt</span>
+      </button>
+      <button class="garment-btn" data-garment="fur">
+        <span class="num">02</span><span>Bigfoot Fur Coat</span>
+      </button>
+      <button class="garment-btn" data-garment="scarf">
+        <span class="num">03</span><span>Scarf-Vest</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="info">
+    <b>Trascina</b> ruota · <b>Scroll</b> zoom · <b>H</b> nasconde UI
+  </div>
+
+  <div id="stats">
+    <div id="fps">— fps</div>
+  </div>
+
+  <div id="vignette"></div>
+  <canvas id="c"></canvas>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ================================================================
+    // ATELIER SFERICO — TMMT Lookbook 3D
+    // Mesh procedurali su manichino stilizzato.
+    // Shader brutalista: NPR architetturale, no outline nero.
+    // ================================================================
+
+    // --- Renderer / scene / camera ---
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x070707);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x070707, 7, 18);
+
+    const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(3.2, 2.8, 5.2);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.target.set(0, 2.3, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 3.8;
+    controls.maxDistance = 9;
+    controls.minPolarAngle = Math.PI * 0.22;
+    controls.maxPolarAngle = Math.PI * 0.58;
+    controls.enablePan = false;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.9;
+
+    // --- Lighting (editorial: warm key + cool fill + warm rim) ---
+    const keyLight = new THREE.DirectionalLight(0xfff2e0, 1.5);
+    keyLight.position.set(4, 6, 3);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xa0b8d0, 0.22);
+    fillLight.position.set(-4, 2.5, -2);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffd9a0, 0.45);
+    rimLight.position.set(0, 3.5, -5);
+    scene.add(rimLight);
+
+    scene.add(new THREE.AmbientLight(0x1a1a1a, 0.4));
+
+    const LIGHT_DIR = keyLight.position.clone().normalize();
+
+    // --- Floor (subtle, editorial) ---
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(8, 64),
+      new THREE.MeshBasicMaterial({ color: 0x0a0a0a })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    // Spotlight ring on floor
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(1.7, 1.73, 96),
+      new THREE.MeshBasicMaterial({ color: 0x2a2a2a, side: THREE.DoubleSide })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.001;
+    scene.add(ring);
+
+    // ================================================================
+    // MANNEQUIN — stilizzato, proporzioni moda
+    // ================================================================
+    const mannequin = new THREE.Group();
+    scene.add(mannequin);
+
+    const skinMat = new THREE.MeshStandardMaterial({
+      color: 0x202020, roughness: 0.85, metalness: 0.0
+    });
+
+    // Legs (slight contrapposto)
+    const legGeo = new THREE.CylinderGeometry(0.085, 0.07, 1.85, 12);
+    const lLeg = new THREE.Mesh(legGeo, skinMat);
+    lLeg.position.set(-0.13, 0.925, 0.03); lLeg.rotation.z = 0.02;
+    mannequin.add(lLeg);
+    const rLeg = new THREE.Mesh(legGeo, skinMat);
+    rLeg.position.set(0.13, 0.925, -0.05); rLeg.rotation.z = -0.03;
+    mannequin.add(rLeg);
+
+    // Pelvis
+    const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.22, 0.27), skinMat);
+    pelvis.position.set(0, 1.95, 0);
+    mannequin.add(pelvis);
+
+    // Torso (tapered, fashion proportions)
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 1.05, 16), skinMat);
+    torso.position.set(0, 2.55, 0);
+    mannequin.add(torso);
+
+    // Shoulders
+    const shoulders = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.13, 0.27), skinMat);
+    shoulders.position.set(0, 3.05, 0);
+    mannequin.add(shoulders);
+
+    // Neck + head
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.18, 8), skinMat);
+    neck.position.set(0, 3.2, 0);
+    mannequin.add(neck);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 16), skinMat);
+    head.position.set(0, 3.4, 0);
+    mannequin.add(head);
+
+    // Arms (slight outward)
+    const armGeo = new THREE.CylinderGeometry(0.055, 0.05, 1.5, 8);
+    const lArm = new THREE.Mesh(armGeo, skinMat);
+    lArm.position.set(-0.37, 2.45, 0); lArm.rotation.z = 0.13;
+    mannequin.add(lArm);
+    const rArm = new THREE.Mesh(armGeo, skinMat);
+    rArm.position.set(0.37, 2.45, 0); rArm.rotation.z = -0.13;
+    mannequin.add(rArm);
+
+    // ================================================================
+    // SHADERS
+    // ================================================================
+    const vertexShader = `
+      varying vec3 vNormal;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        vNormal = normalize(normalMatrix * normal);
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPos = worldPos.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `;
+
+    // Fur vertex shader: pushes vertices along normals per shell
+    const furVertexShader = `
+      uniform float uShellOffset;
+      varying vec3 vNormal;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        vec3 newPos = position + normal * uShellOffset;
+        vNormal = normalize(normalMatrix * normal);
+        vec4 worldPos = modelMatrix * vec4(newPos, 1.0);
+        vWorldPos = worldPos.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `;
+
+    const fragmentShader = `
+      precision highp float;
+      varying vec3 vNormal;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+
+      uniform vec3 uBaseColor;
+      uniform vec3 uLightDir;
+      uniform float uBands;
+      uniform float uSoftness;
+      uniform float uSpecIntensity;
+      uniform float uSpecShininess;
+      uniform float uSpecThreshold;
+      uniform float uTime;
+      uniform int uMaterialType;       // 0 nylon, 1 denim, 2 laser, 3 fur
+      uniform float uShellIndex;
+      uniform float uShellCount;
+
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+      }
+      float noise(vec2 p) {
+        vec2 i = floor(p); vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i+vec2(1,0)), f.x),
+                   mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
+      }
+      float fbm(vec2 p) {
+        float v = 0.0; float a = 0.5;
+        for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.0; a *= 0.5; }
+        return v;
+      }
+
+      float celShade(float NdotL, float bands, float softness) {
+        float shade = NdotL * 0.5 + 0.5;
+        float bw = 1.0 / bands;
+        float band = floor(shade * bands) / bands;
+        float next = min(band + bw, 1.0);
+        float t = (shade - band) / bw;
+        return mix(band, next, smoothstep(1.0 - softness, 1.0, t));
+      }
+
+      void main() {
+        vec3 N = normalize(vNormal);
+        vec3 L = normalize(uLightDir);
+        float NdotL = dot(N, L);
+        float cel = celShade(NdotL, uBands, uSoftness);
+        vec3 color = uBaseColor * cel;
+        float alpha = 1.0;
+        vec3 V = normalize(cameraPosition - vWorldPos);
+
+        if (uMaterialType == 0) {
+          // NYLON PADDED — specular Blinn-Phong netto
+          vec3 H = normalize(L + V);
+          float spec = pow(max(dot(N, H), 0.0), uSpecShininess);
+          spec = smoothstep(uSpecThreshold, uSpecThreshold + 0.05, spec);
+          color += vec3(spec) * uSpecIntensity;
+          float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+          color += vec3(0.06, 0.08, 0.12) * rim;
+
+        } else if (uMaterialType == 1) {
+          // WASHED DENIM — weave + hand-bleaching organico
+          float weave = sin(vUv.y * 240.0) * 0.5 + 0.5;
+          weave = mix(0.91, 1.0, weave);
+          float fabNoise = fbm(vUv * 8.0);
+          fabNoise = mix(0.7, 1.1, fabNoise);
+          float bleach = fbm(vUv * 3.0);
+          bleach = smoothstep(0.45, 0.7, bleach);
+          vec3 bleached = mix(uBaseColor, uBaseColor * 1.7 + vec3(0.05, 0.06, 0.08), 0.6);
+          vec3 base = mix(uBaseColor, bleached, bleach) * weave * fabNoise;
+          color = base * cel;
+          vec3 H = normalize(L + V);
+          float spec = pow(max(dot(N, H), 0.0), uSpecShininess);
+          color += vec3(spec) * uSpecIntensity * 0.3;
+
+        } else if (uMaterialType == 2) {
+          // LASER ENGRAVED — perturbazione normale ad alta frequenza
+          float engrave = fbm(vUv * 40.0);
+          float mask = smoothstep(0.48, 0.52, engrave);
+          vec3 fakeN = N;
+          float p = (engrave - 0.5) * 0.6;
+          fakeN.xy += vec2(p, -p * 0.7);
+          fakeN = normalize(fakeN);
+          float engravedCel = celShade(dot(fakeN, L), uBands, uSoftness * 0.5);
+          vec3 lightC = uBaseColor * cel;
+          vec3 darkC = uBaseColor * engravedCel * 0.35;
+          color = mix(lightC, darkC, mask);
+          float edge = smoothstep(0.45, 0.5, engrave) * (1.0 - smoothstep(0.5, 0.55, engrave));
+          color += vec3(0.08, 0.08, 0.1) * edge;
+
+        } else if (uMaterialType == 3) {
+          // ECO-FUR (Fur Shells) — alpha noise, outer shells sparser + lighter
+          float strandN = fbm(vUv * 70.0 + uShellIndex * 0.6);
+          float strands = smoothstep(0.32, 0.65, strandN);
+          float shellProg = uShellIndex / uShellCount;
+          float shellFade = 1.0 - shellProg * 0.85;
+          alpha = strands * shellFade;
+          // Inner shells darker (undercoat), outer lighter (tips)
+          vec3 innerC = uBaseColor * 0.72;
+          vec3 outerC = uBaseColor * 1.28;
+          vec3 furC = mix(innerC, outerC, shellProg);
+          furC *= mix(0.82, 1.18, strandN);
+          color = furC * cel;
+        }
+
+        // Desaturazione lieve in ombra — look bozzetto tecnico
+        float lum = dot(color, vec3(0.299, 0.587, 0.114));
+        color = mix(vec3(lum), color, 0.92);
+        color = pow(color, vec3(1.0 / 2.2));
+        gl_FragColor = vec4(color, alpha);
+      }
+    `;
+
+    // ================================================================
+    // MATERIAL PRESETS
+    // ================================================================
+    const PRESETS = {
+      nylon: {
+        baseColor: new THREE.Color(0x1c1c1c),
+        bands: 3.0, softness: 0.22,
+        specIntensity: 1.5, specShininess: 80.0, specThreshold: 0.6,
+        type: 0,
+      },
+      nylonLight: {
+        baseColor: new THREE.Color(0x2a2a2a),
+        bands: 3.0, softness: 0.22,
+        specIntensity: 1.4, specShininess: 70.0, specThreshold: 0.6,
+        type: 0,
+      },
+      denim: {
+        baseColor: new THREE.Color(0x2a3d5e),
+        bands: 4.0, softness: 0.55,
+        specIntensity: 0.3, specShininess: 12.0, specThreshold: 0.8,
+        type: 1,
+      },
+      fur: {
+        baseColor: new THREE.Color(0xc8b896),
+        bands: 3.0, softness: 0.4,
+        specIntensity: 0.1, specShininess: 8.0, specThreshold: 0.9,
+        type: 3,
+      },
+    };
+
+    function makeMat(preset) {
+      return new THREE.ShaderMaterial({
+        vertexShader, fragmentShader,
+        uniforms: {
+          uBaseColor:     { value: preset.baseColor.clone() },
+          uLightDir:      { value: LIGHT_DIR.clone() },
+          uBands:         { value: preset.bands },
+          uSoftness:      { value: preset.softness },
+          uSpecIntensity: { value: preset.specIntensity },
+          uSpecShininess: { value: preset.specShininess },
+          uSpecThreshold: { value: preset.specThreshold },
+          uTime:          { value: 0 },
+          uMaterialType:  { value: preset.type },
+          uShellIndex:    { value: 0 },
+          uShellCount:    { value: 1 },
+        },
+      });
+    }
+
+    function makeFurMat(shellIndex, shellCount, preset) {
+      return new THREE.ShaderMaterial({
+        vertexShader: furVertexShader,
+        fragmentShader,
+        transparent: true,
+        depthWrite: false,
+        uniforms: {
+          uBaseColor:     { value: preset.baseColor.clone() },
+          uLightDir:      { value: LIGHT_DIR.clone() },
+          uBands:         { value: preset.bands },
+          uSoftness:      { value: preset.softness },
+          uSpecIntensity: { value: preset.specIntensity },
+          uSpecShininess: { value: preset.specShininess },
+          uSpecThreshold: { value: preset.specThreshold },
+          uTime:          { value: 0 },
+          uMaterialType:  { value: 3 },
+          uShellIndex:    { value: shellIndex },
+          uShellCount:    { value: shellCount },
+          uShellOffset:   { value: shellIndex * 0.013 },
+        },
+      });
+    }
+
+    // Puffy displacement helper
+    function applyPuffy(geo, amount, freq) {
+      geo.computeVertexNormals();
+      const pos = geo.attributes.position;
+      const nor = geo.attributes.normal;
+      const v = new THREE.Vector3();
+      const n = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        n.fromBufferAttribute(nor, i);
+        const ns =
+          Math.sin(v.x * freq) * Math.cos(v.y * freq * 1.3 + v.z * 0.5) * 0.5 +
+          Math.sin(v.z * freq * 0.8 + v.y * freq * 0.5) * 0.5;
+        v.addScaledVector(n, ns * amount);
+        pos.setXYZ(i, v.x, v.y, v.z);
+      }
+      pos.needsUpdate = true;
+      geo.computeVertexNormals();
+    }
+
+    // ================================================================
+    // GARMENT 01 — BULK SHIRT (Washed Denim)
+    // ================================================================
+    const bulkShirt = new THREE.Group();
+    bulkShirt.visible = false;
+    scene.add(bulkShirt);
+
+    {
+      const mat = makeMat(PRESETS.denim);
+
+      // Torso (boxy, oversized)
+      const torsoGeo = new THREE.BoxGeometry(0.74, 1.25, 0.44, 18, 28, 14);
+      applyPuffy(torsoGeo, 0.022, 5.0);
+      const t = new THREE.Mesh(torsoGeo, mat);
+      t.position.set(0, 2.5, 0);
+      bulkShirt.add(t);
+
+      // Drop-shoulder yoke
+      const yokeGeo = new THREE.BoxGeometry(0.9, 0.14, 0.44, 10, 4, 8);
+      applyPuffy(yokeGeo, 0.018, 6.0);
+      const y = new THREE.Mesh(yokeGeo, mat);
+      y.position.set(0, 3.07, 0);
+      bulkShirt.add(y);
+
+      // Sleeves (cylinders, slight flare)
+      const sleeveGeo = new THREE.CylinderGeometry(0.145, 0.12, 1.3, 16, 14);
+      applyPuffy(sleeveGeo, 0.018, 5.0);
+      const lS = new THREE.Mesh(sleeveGeo, mat);
+      lS.position.set(-0.47, 2.45, 0); lS.rotation.z = 0.15;
+      bulkShirt.add(lS);
+      const rS = new THREE.Mesh(sleeveGeo.clone(), mat);
+      rS.position.set(0.47, 2.45, 0); rS.rotation.z = -0.15;
+      bulkShirt.add(rS);
+
+      // Collar (two small angled plates)
+      const collarGeo = new THREE.BoxGeometry(0.12, 0.06, 0.2);
+      const lC = new THREE.Mesh(collarGeo, mat);
+      lC.position.set(-0.07, 3.16, 0.18); lC.rotation.y = 0.35;
+      bulkShirt.add(lC);
+      const rC = new THREE.Mesh(collarGeo, mat);
+      rC.position.set(0.07, 3.16, 0.18); rC.rotation.y = -0.35;
+      bulkShirt.add(rC);
+
+      // Center placket
+      const placket = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 1.05, 0.025),
+        mat
+      );
+      placket.position.set(0, 2.5, 0.235);
+      bulkShirt.add(placket);
+
+      // Welt pockets (front, angled)
+      const pocketGeo = new THREE.BoxGeometry(0.18, 0.04, 0.015);
+      const lP = new THREE.Mesh(pocketGeo, mat);
+      lP.position.set(-0.18, 2.15, 0.225); lP.rotation.z = 0.15;
+      bulkShirt.add(lP);
+      const rP = new THREE.Mesh(pocketGeo, mat);
+      rP.position.set(0.18, 2.15, 0.225); rP.rotation.z = -0.15;
+      bulkShirt.add(rP);
+    }
+
+    // ================================================================
+    // GARMENT 02 — BIGFOOT FUR COAT (Eco-Fur via Fur Shells)
+    // ================================================================
+    const furCoat = new THREE.Group();
+    furCoat.visible = false;
+    scene.add(furCoat);
+
+    {
+      const SHELL_COUNT = 16;
+
+      // Base coat body geometry (massive, oversized, soft)
+      const coatGeo = new THREE.BoxGeometry(1.1, 1.7, 0.62, 14, 24, 12);
+      applyPuffy(coatGeo, 0.025, 3.5);
+
+      // Sleeve geometry (oversized)
+      const sleeveGeo = new THREE.CylinderGeometry(0.2, 0.17, 1.5, 14, 12);
+      applyPuffy(sleeveGeo, 0.02, 3.5);
+
+      for (let i = 0; i < SHELL_COUNT; i++) {
+        const shellMat = makeFurMat(i, SHELL_COUNT, PRESETS.fur);
+
+        // Body
+        const body = new THREE.Mesh(coatGeo, shellMat);
+        body.position.set(0, 2.35, 0);
+        body.renderOrder = i;
+        furCoat.add(body);
+
+        // Left sleeve
+        const lSl = new THREE.Mesh(sleeveGeo, shellMat);
+        lSl.position.set(-0.6, 2.3, 0); lSl.rotation.z = 0.15;
+        lSl.renderOrder = i;
+        furCoat.add(lSl);
+
+        // Right sleeve
+        const rSl = new THREE.Mesh(sleeveGeo.clone(), shellMat);
+        rSl.position.set(0.6, 2.3, 0); rSl.rotation.z = -0.15;
+        rSl.renderOrder = i;
+        furCoat.add(rSl);
+      }
+
+      // Inner collar — visible at neck opening
+      const collarMat = makeMat({
+        baseColor: new THREE.Color(0x6a5a3a),
+        bands: 3.0, softness: 0.4,
+        specIntensity: 0.1, specShininess: 8.0, specThreshold: 0.9,
+        type: 0,
+      });
+      const collarGeo = new THREE.TorusGeometry(0.2, 0.07, 8, 24, Math.PI * 0.85);
+      const collar = new THREE.Mesh(collarGeo, collarMat);
+      collar.position.set(0, 3.1, 0);
+      collar.rotation.x = -Math.PI / 2;
+      collar.rotation.z = -Math.PI / 2;
+      furCoat.add(collar);
+    }
+
+    // ================================================================
+    // GARMENT 03 — SCARF-VEST (Nylon Padded + wrapped scarf)
+    // ================================================================
+    const scarfVest = new THREE.Group();
+    scarfVest.visible = false;
+    scene.add(scarfVest);
+
+    {
+      const vestMat = makeMat(PRESETS.nylon);
+      const scarfMat = makeMat(PRESETS.nylonLight);
+
+      // Vest torso (shorter, very puffy)
+      const vestGeo = new THREE.BoxGeometry(0.66, 0.95, 0.42, 14, 18, 10);
+      applyPuffy(vestGeo, 0.07, 4.0);  // heavy puff
+      const vest = new THREE.Mesh(vestGeo, vestMat);
+      vest.position.set(0, 2.55, 0);
+      scarfVest.add(vest);
+
+      // Vest shoulder yoke
+      const yokeGeo = new THREE.BoxGeometry(0.8, 0.13, 0.42, 10, 4, 8);
+      applyPuffy(yokeGeo, 0.05, 4.0);
+      const yoke = new THREE.Mesh(yokeGeo, vestMat);
+      yoke.position.set(0, 3.05, 0);
+      scarfVest.add(yoke);
+
+      // Vest hem (slightly flared)
+      const hemGeo = new THREE.BoxGeometry(0.7, 0.08, 0.44, 10, 2, 8);
+      applyPuffy(hemGeo, 0.04, 4.0);
+      const hem = new THREE.Mesh(hemGeo, vestMat);
+      hem.position.set(0, 2.1, 0);
+      scarfVest.add(hem);
+
+      // Scarf — single tube wrapping diagonally around neck, with long tail
+      const scarfCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0.35, 3.15, 0.18),    // right shoulder front
+        new THREE.Vector3(0.12, 3.05, 0.24),    // diagonal across chest
+        new THREE.Vector3(-0.15, 3.05, 0.22),
+        new THREE.Vector3(-0.36, 3.12, 0.05),   // left shoulder
+        new THREE.Vector3(-0.32, 3.18, -0.16),  // back of neck left
+        new THREE.Vector3(-0.08, 3.22, -0.22),  // back center
+        new THREE.Vector3(0.18, 3.18, -0.16),   // back right
+        new THREE.Vector3(0.34, 3.08, -0.02),   // over right shoulder back
+        new THREE.Vector3(0.38, 2.8, 0.12),     // coming down front right
+        new THREE.Vector3(0.35, 2.4, 0.14),
+        new THREE.Vector3(0.32, 2.0, 0.12),
+        new THREE.Vector3(0.3, 1.6, 0.1),       // long hanging tail
+        new THREE.Vector3(0.28, 1.2, 0.08),
+      ]);
+      const scarfGeo = new THREE.TubeGeometry(scarfCurve, 120, 0.1, 14, false);
+      applyPuffy(scarfGeo, 0.022, 5.0);
+      const scarf = new THREE.Mesh(scarfGeo, scarfMat);
+      scarfVest.add(scarf);
+
+      // Short tail (left side, hangs to waist)
+      const tail2Curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-0.36, 3.12, 0.05),
+        new THREE.Vector3(-0.4, 2.8, 0.02),
+        new THREE.Vector3(-0.42, 2.4, 0.04),
+        new THREE.Vector3(-0.42, 2.0, 0.02),
+      ]);
+      const tail2Geo = new THREE.TubeGeometry(tail2Curve, 40, 0.09, 12, false);
+      applyPuffy(tail2Geo, 0.02, 5.0);
+      const tail2 = new THREE.Mesh(tail2Geo, scarfMat);
+      scarfVest.add(tail2);
+
+      // Center zipper (vertical line on vest front)
+      const zipper = new THREE.Mesh(
+        new THREE.BoxGeometry(0.015, 0.85, 0.012),
+        new THREE.MeshBasicMaterial({ color: 0x101010 })
+      );
+      zipper.position.set(0, 2.55, 0.215);
+      scarfVest.add(zipper);
+    }
+
+    // ================================================================
+    // UI — garment switching
+    // ================================================================
+    const groups = { bulk: bulkShirt, fur: furCoat, scarf: scarfVest };
+
+    const DESC = {
+      bulk: {
+        code: 'Look 03 — Washed Denim',
+        name: 'BULK SHIRT',
+        desc: 'Boxy oversized silhouette. Hand-bleached washed denim. Drop shoulders, extended hem. Front welt pockets replace traditional chest pockets.',
+      },
+      fur: {
+        code: 'Look 09 — Eco-Fur',
+        name: 'BIGFOOT FUR COAT',
+        desc: 'Massive eco-fur volume. Bigfoot silhouette. The showpiece — protective, sculptural, unapologetic. Rendered via Fur Shells: 16 concentric layers with procedural strand noise.',
+      },
+      scarf: {
+        code: 'Look 04 — Nylon Padded',
+        name: 'SCARF-VEST',
+        desc: 'Padded nylon vest with integrated scarf wrapping diagonally around neck. Protective geometry. Technical material, sartorial logic.',
+      },
+    };
+
+    function showGarment(key) {
+      Object.entries(groups).forEach(([k, g]) => g.visible = (k === key));
+      const d = DESC[key];
+      document.getElementById('garment-code').textContent = d.code;
+      document.getElementById('garment-name').textContent = d.name;
+      document.getElementById('garment-desc').textContent = d.desc;
+      document.querySelectorAll('.garment-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.garment === key);
+      });
+    }
+
+    document.querySelectorAll('.garment-btn').forEach(btn => {
+      btn.addEventListener('click', () => showGarment(btn.dataset.garment));
+    });
+
+    // Initial: bulk shirt
+    showGarment('bulk');
+
+    // H toggles UI
+    document.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'h') {
+        const ui = document.getElementById('ui');
+        const info = document.getElementById('info');
+        const stats = document.getElementById('stats');
+        const hidden = ui.style.display === 'none';
+        ui.style.display = hidden ? '' : 'none';
+        info.style.display = hidden ? '' : 'none';
+        stats.style.display = hidden ? '' : 'none';
+      }
+    });
+
+    // Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ================================================================
+    // Render loop
+    // ================================================================
+    const fpsEl = document.getElementById('fps');
+    let lastFps = performance.now();
+    let frames = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = performance.now() * 0.001;
+
+      controls.update();
+      renderer.render(scene, camera);
+
+      frames++;
+      const now = performance.now();
+      if (now - lastFps > 500) {
+        fpsEl.textContent = Math.round((frames * 1000) / (now - lastFps)) + ' fps';
+        frames = 0;
+        lastFps = now;
+      }
+    }
+
+    animate();
+    document.body.classList.add('loaded');
+  </script>
+</body>
+</html>

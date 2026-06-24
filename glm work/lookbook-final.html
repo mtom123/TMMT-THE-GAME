@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atelier Sferico — TMMT Lookbook 3D / Messenger Style</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #f0ece4; color: #1a1a1a;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+    canvas { display: block; }
+
+    #ui {
+      position: fixed;
+      top: 32px; left: 32px;
+      z-index: 10;
+      max-width: 360px;
+      pointer-events: none;
+    }
+    #ui > * { pointer-events: auto; }
+
+    .brand {
+      font-size: 9px;
+      letter-spacing: 0.4em;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .title {
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      color: #1a1a1a;
+      margin-bottom: 36px;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    .garment-info {
+      margin-bottom: 32px;
+      min-height: 140px;
+    }
+    .garment-code {
+      font-size: 9px;
+      letter-spacing: 0.3em;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .garment-name {
+      font-size: 28px;
+      letter-spacing: -0.01em;
+      color: #1a1a1a;
+      margin-bottom: 14px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .garment-desc {
+      font-size: 11px;
+      line-height: 1.65;
+      color: #555;
+      letter-spacing: 0.01em;
+      font-weight: 400;
+    }
+    .garment-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .garment-btn {
+      background: transparent;
+      border: 1px solid #d0c8b8;
+      color: #555;
+      padding: 13px 18px;
+      font-family: inherit;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-weight: 600;
+    }
+    .garment-btn:hover { border-color: #1a1a1a; color: #1a1a1a; background: rgba(0,0,0,0.03); }
+    .garment-btn.active { border-color: #1a1a1a; color: #1a1a1a; background: rgba(0,0,0,0.05); }
+    .garment-btn .num { font-size: 9px; color: #aaa; }
+    .garment-btn.active .num { color: #555; }
+
+    #info {
+      position: fixed;
+      bottom: 32px; left: 32px;
+      font-size: 9px;
+      color: #888;
+      letter-spacing: 0.15em;
+      line-height: 1.8;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    #info b { color: #1a1a1a; font-weight: 700; }
+
+    #stats {
+      position: fixed;
+      bottom: 32px; right: 32px;
+      font-size: 9px;
+      color: #888;
+      text-align: right;
+      letter-spacing: 0.2em;
+      font-weight: 600;
+    }
+
+    #vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 55%, rgba(180,160,120,0.18) 100%);
+      z-index: 5;
+    }
+
+    body { opacity: 0; transition: opacity 0.8s ease; }
+    body.loaded { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div class="brand">TMMT — Atelier Sferico</div>
+    <div class="title">Lookbook 3D</div>
+    <div class="garment-info">
+      <div class="garment-code" id="garment-code">Look 03 — Washed Denim</div>
+      <div class="garment-name" id="garment-name">BULK SHIRT</div>
+      <div class="garment-desc" id="garment-desc">Boxy oversized silhouette. Hand-bleached washed denim. Drop shoulders, extended hem. Front welt pockets replace traditional chest pockets.</div>
+    </div>
+    <div class="garment-buttons">
+      <button class="garment-btn active" data-garment="bulk">
+        <span class="num">01</span><span>Bulk Shirt</span>
+      </button>
+      <button class="garment-btn" data-garment="fur">
+        <span class="num">02</span><span>Bigfoot Fur Coat</span>
+      </button>
+      <button class="garment-btn" data-garment="scarf">
+        <span class="num">03</span><span>Scarf-Vest</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="info">
+    <b>Trascina</b> ruota · <b>Scroll</b> zoom · <b>H</b> nasconde UI
+  </div>
+  <div id="stats">
+    <div id="fps">— fps</div>
+  </div>
+  <div id="vignette"></div>
+  <canvas id="c"></canvas>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { createMannequin } from './mannequin.js';
+    import { createBulkShirt } from './garment-bulk-shirt.js';
+    import { createFurCoat } from './garment-fur-coat.js';
+    import { createScarfVest } from './garment-scarf-vest.js';
+
+    // --- Renderer ---
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0xf0ece4);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0xf0ece4, 9, 22);
+
+    const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(3.4, 2.9, 5.5);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.target.set(0, 2.3, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 3.8;
+    controls.maxDistance = 9;
+    controls.minPolarAngle = Math.PI * 0.18;
+    controls.maxPolarAngle = Math.PI * 0.62;
+    controls.enablePan = false;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.7;
+
+    // --- Lighting ---
+    const keyLight = new THREE.DirectionalLight(0xfff0d8, 1.4);
+    keyLight.position.set(4, 6, 3);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xb0c4d8, 0.25);
+    fillLight.position.set(-4, 2.5, -2);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffd9a0, 0.5);
+    rimLight.position.set(0, 3.5, -5);
+    scene.add(rimLight);
+
+    scene.add(new THREE.AmbientLight(0x2a2620, 0.5));
+
+    // --- Floor ---
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(10, 64),
+      new THREE.MeshBasicMaterial({ color: 0xe8e0d0 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(1.6, 1.63, 96),
+      new THREE.MeshBasicMaterial({ color: 0x999080, side: THREE.DoubleSide })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.001;
+    scene.add(ring);
+
+    // --- Mannequin ---
+    const mannequin = createMannequin();
+    scene.add(mannequin);
+
+    // --- Garments ---
+    const garments = {
+      bulk: createBulkShirt(),
+      fur: createFurCoat(),
+      scarf: createScarfVest(),
+    };
+
+    Object.values(garments).forEach(g => {
+      g.visible = false;
+      scene.add(g);
+    });
+
+    // --- UI ---
+    const DESC = {
+      bulk: {
+        code: 'Look 03 — Washed Denim',
+        name: 'BULK SHIRT',
+        desc: 'Boxy oversized silhouette. Hand-bleached washed denim. Drop shoulders, extended hem. Front welt pockets replace traditional chest pockets.',
+      },
+      fur: {
+        code: 'Look 09 — Eco-Fur',
+        name: 'BIGFOOT FUR COAT',
+        desc: 'Massive eco-fur volume. Bigfoot silhouette. The showpiece — protective, sculptural, unapologetic. Rendered via Fur Shells: 14 concentric layers with procedural strand noise.',
+      },
+      scarf: {
+        code: 'Look 04 — Nylon Padded',
+        name: 'SCARF-VEST',
+        desc: 'Padded nylon vest with integrated scarf wrapping diagonally around neck. Protective geometry. Technical material, sartorial logic.',
+      },
+    };
+
+    function showGarment(key) {
+      Object.entries(garments).forEach(([k, g]) => g.visible = (k === key));
+      const d = DESC[key];
+      document.getElementById('garment-code').textContent = d.code;
+      document.getElementById('garment-name').textContent = d.name;
+      document.getElementById('garment-desc').textContent = d.desc;
+      document.querySelectorAll('.garment-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.garment === key);
+      });
+    }
+
+    document.querySelectorAll('.garment-btn').forEach(btn => {
+      btn.addEventListener('click', () => showGarment(btn.dataset.garment));
+    });
+
+    showGarment('bulk');
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'h') {
+        const ui = document.getElementById('ui');
+        const info = document.getElementById('info');
+        const stats = document.getElementById('stats');
+        const hidden = ui.style.display === 'none';
+        ui.style.display = hidden ? '' : 'none';
+        info.style.display = hidden ? '' : 'none';
+        stats.style.display = hidden ? '' : 'none';
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const fpsEl = document.getElementById('fps');
+    let lastFps = performance.now();
+    let frames = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+
+      frames++;
+      const now = performance.now();
+      if (now - lastFps > 500) {
+        fpsEl.textContent = Math.round((frames * 1000) / (now - lastFps)) + ' fps';
+        frames = 0;
+        lastFps = now;
+      }
+    }
+
+    animate();
+    document.body.classList.add('loaded');
+  </script>
+</body>
+</html>

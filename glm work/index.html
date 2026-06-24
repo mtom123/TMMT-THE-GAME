@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atelier Sferico — Spike Shader TMMT 2025-26</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0a0a; color: #d4d4d4; font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace; }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    #ui {
+      position: fixed;
+      top: 24px;
+      left: 24px;
+      z-index: 10;
+      max-width: 380px;
+    }
+    #ui h1 {
+      font-size: 10px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: #888;
+      font-weight: 400;
+      margin-bottom: 6px;
+    }
+    #ui h2 {
+      font-size: 18px;
+      letter-spacing: -0.01em;
+      font-weight: 500;
+      margin-bottom: 16px;
+      color: #f5f5f5;
+    }
+    #ui .desc {
+      font-size: 11px;
+      line-height: 1.55;
+      color: #777;
+      margin-bottom: 24px;
+    }
+    #materials {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .mat-btn {
+      background: transparent;
+      border: 1px solid #2a2a2a;
+      color: #d4d4d4;
+      padding: 11px 14px;
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s ease;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .mat-btn:hover { border-color: #555; background: #141414; }
+    .mat-btn.active { border-color: #f5f5f5; background: #1a1a1a; color: #ffffff; }
+    .mat-btn .code { color: #666; font-size: 10px; }
+    .mat-btn.active .code { color: #aaa; }
+
+    #info {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      font-size: 10px;
+      color: #555;
+      letter-spacing: 0.05em;
+      line-height: 1.7;
+      max-width: 400px;
+    }
+    #info b { color: #888; font-weight: 500; }
+
+    #stats {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      font-size: 10px;
+      color: #555;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <h1>TMMT / Atelier Sferico</h1>
+    <h2>Spike Shader — NPR Architetturale</h2>
+    <div class="desc">
+      Validazione estetica del custom cel-shader "brutalista" su mesh di test.
+      Nessun outline nero. Ombreggiatura a gradini con soglia morbida.
+      Tre trattamenti materiali della collezione 2025-26.
+    </div>
+    <div id="materials">
+      <button class="mat-btn active" data-mat="nylon">
+        <span>Nylon Padded</span><span class="code">01</span>
+      </button>
+      <button class="mat-btn" data-mat="denim">
+        <span>Washed Denim</span><span class="code">02</span>
+      </button>
+      <button class="mat-btn" data-mat="laser">
+        <span>Laser Engraved</span><span class="code">03</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="info">
+    <b>Mesh di test</b>: volume sferico displaced (simula imbottitura).<br>
+    Nello spike reale: mesh del capo da Blender con topologia pulita.<br>
+    <b>Controlli</b>: trascina per ruotare · scroll per zoom · click sui pulsanti per switchare materiale.
+  </div>
+
+  <div id="stats">
+    <div id="fps">— fps</div>
+  </div>
+
+  <canvas id="c"></canvas>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ============================================================
+    // SPIKE SHADER — Atelier Sferico / TMMT 2025-26
+    // Estetica: NPR architetturale / brutalista
+    // NO outline nero · cel-shading con soglia morbida (smoothstep)
+    // ============================================================
+
+    // --- Setup renderer + scena ---
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x0a0a0a);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0.6, 4.8);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 2.5;
+    controls.maxDistance = 8;
+    controls.enablePan = false;
+
+    // --- Illuminazione: 1 key light + soft fill ---
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    keyLight.position.set(3, 4, 2);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xc8d0e0, 0.18);
+    fillLight.position.set(-2, -1, -1);
+    scene.add(fillLight);
+
+    const ambient = new THREE.AmbientLight(0x1a1a1a, 0.3);
+    scene.add(ambient);
+
+    // --- Mesh di test: sfera "puffy" displaced ---
+    // Simula il volume di una giacca imbottita (padded nylon)
+    function createPuffyGeometry(radius = 1.2, detail = 7) {
+      const geo = new THREE.IcosahedronGeometry(radius, detail);
+      const pos = geo.attributes.position;
+      const v = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        // Somma di seni per creare "pads" organici
+        const n1 = Math.sin(v.x * 6) * Math.cos(v.y * 6 + v.z * 2);
+        const n2 = Math.sin(v.z * 5 - v.y * 3) * 0.6;
+        const puff = (n1 + n2) * 0.08;
+        v.multiplyScalar(1 + puff);
+        pos.setXYZ(i, v.x, v.y, v.z);
+      }
+      pos.needsUpdate = true;
+      geo.computeVertexNormals();
+      return geo;
+    }
+
+    const geometry = createPuffyGeometry(1.2, 7);
+
+    // --- Vertex shader: standard, passa normali e world position ---
+    const vertexShader = `
+      varying vec3 vNormal;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+
+      void main() {
+        vUv = uv;
+        vNormal = normalize(normalMatrix * normal);
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPos = worldPos.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `;
+
+    // --- Fragment shader: cel-shading brutalista ---
+    // Caratteristiche:
+    //  - SOGLIA MORBIDA (smoothstep) invece di step netto → niente estetica anime
+    //  - NO outline nero → i contorni emergono solo dalle ombre
+    //  - 3 varianti materiali: nylon, denim, laser engraving
+    const fragmentShader = `
+      precision highp float;
+
+      varying vec3 vNormal;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+
+      uniform vec3 uBaseColor;
+      uniform vec3 uLightDir;
+      uniform float uBands;
+      uniform float uSoftness;       // 0 = step netto, 1 = continuo
+      uniform float uSpecIntensity;
+      uniform float uSpecShininess;
+      uniform float uSpecThreshold;
+      uniform float uTime;
+      uniform int uMaterialType;     // 0 = nylon, 1 = denim, 2 = laser
+
+      // --- Noise utilities ---
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+      }
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        float a = hash(i);
+        float b = hash(i + vec2(1.0, 0.0));
+        float c = hash(i + vec2(0.0, 1.0));
+        float d = hash(i + vec2(1.0, 1.0));
+        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+      }
+      float fbm(vec2 p) {
+        float v = 0.0;
+        float a = 0.5;
+        for (int i = 0; i < 5; i++) {
+          v += a * noise(p);
+          p *= 2.0;
+          a *= 0.5;
+        }
+        return v;
+      }
+
+      // Cel-shading con soglia morbida
+      float celShade(float NdotL, float bands, float softness) {
+        float shade = NdotL * 0.5 + 0.5;             // [-1,1] -> [0,1]
+        float bandWidth = 1.0 / bands;
+        float band = floor(shade * bands) / bands;
+        float nextBand = min(band + bandWidth, 1.0);
+        float localT = (shade - band) / bandWidth;
+        float mixFactor = smoothstep(1.0 - softness, 1.0, localT);
+        return mix(band, nextBand, mixFactor);
+      }
+
+      void main() {
+        vec3 N = normalize(vNormal);
+        vec3 L = normalize(uLightDir);
+        float NdotL = dot(N, L);
+
+        // Base cel-shade
+        float cel = celShade(NdotL, uBands, uSoftness);
+        vec3 color = uBaseColor * cel;
+
+        // --- Varianti materiali ---
+        if (uMaterialType == 0) {
+          // NYLON PADDED
+          // Speculare Blinn-Phong con threshold STRETTO -> highlight netto, tecnico
+          vec3 V = normalize(cameraPosition - vWorldPos);
+          vec3 H = normalize(L + V);
+          float spec = pow(max(dot(N, H), 0.0), uSpecShininess);
+          spec = smoothstep(uSpecThreshold, uSpecThreshold + 0.05, spec);
+          color += vec3(spec) * uSpecIntensity;
+
+          // Rim light freddo sottilissimo per separare dal fondo
+          float rim = 1.0 - max(dot(N, V), 0.0);
+          rim = pow(rim, 3.0);
+          color += vec3(0.05, 0.08, 0.12) * rim;
+
+        } else if (uMaterialType == 1) {
+          // WASHED DENIM
+          // Struttura tessile (righe weft) + variazione organica + hand-bleaching
+
+          // Righe weft (tessitura verticale)
+          float weave = sin(vUv.y * 220.0) * 0.5 + 0.5;
+          weave = mix(0.92, 1.0, weave);
+
+          // Variazione organica del tessuto
+          float fabricNoise = fbm(vUv * 8.0);
+          fabricNoise = mix(0.7, 1.1, fabricNoise);
+
+          // Hand-bleaching: gradienti morbidi irregolari
+          vec2 bleachUv = vUv * 3.0;
+          float bleach = fbm(bleachUv);
+          bleach = smoothstep(0.45, 0.7, bleach);
+          vec3 bleachedColor = mix(uBaseColor, uBaseColor * 1.7 + vec3(0.05, 0.06, 0.08), 0.6);
+
+          vec3 denimBase = mix(uBaseColor, bleachedColor, bleach);
+          denimBase *= weave * fabricNoise;
+          color = denimBase * cel;
+
+          // Speculare debole diffuso (denim non riflette molto)
+          vec3 V = normalize(cameraPosition - vWorldPos);
+          vec3 H = normalize(L + V);
+          float spec = pow(max(dot(N, H), 0.0), uSpecShininess);
+          color += vec3(spec) * uSpecIntensity * 0.3;
+
+        } else if (uMaterialType == 2) {
+          // LASER ENGRAVED COTTON
+          // Micro-incisioni nette che cambiano localmente le ombre
+
+          // Pattern incisione: noise alta frequenza con threshold netto
+          float engrave = fbm(vUv * 40.0);
+          float engraveMask = smoothstep(0.48, 0.52, engrave);
+
+          // Perturbazione simulata della normale
+          vec3 fakeN = N;
+          float perturb = (engrave - 0.5) * 0.6;
+          fakeN.xy += vec2(perturb, -perturb * 0.7);
+          fakeN = normalize(fakeN);
+          float engravedCel = celShade(dot(fakeN, L), uBands, uSoftness * 0.5);
+
+          // Mix fra zona chiara (non incisa) e zona scura (incisa)
+          vec3 lightColor = uBaseColor * cel;
+          vec3 darkColor = uBaseColor * engravedCel * 0.35;
+          color = mix(lightColor, darkColor, engraveMask);
+
+          // Glow sottile sui bordi dell'incisione per leggibilità
+          float edgeGlow = smoothstep(0.45, 0.5, engrave) * (1.0 - smoothstep(0.5, 0.55, engrave));
+          color += vec3(0.08, 0.08, 0.1) * edgeGlow;
+        }
+
+        // Leggera desaturazione nelle ombre per look "bozzetto tecnico"
+        float lum = dot(color, vec3(0.299, 0.587, 0.114));
+        color = mix(vec3(lum), color, 0.92);
+
+        // Gamma correction
+        color = pow(color, vec3(1.0 / 2.2));
+
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `;
+
+    // --- Preset materiali ---
+    const MATERIALS = {
+      nylon: {
+        baseColor: new THREE.Color(0x1a1a1a),
+        bands: 3.0,
+        softness: 0.25,
+        specIntensity: 1.3,
+        specShininess: 80.0,
+        specThreshold: 0.6,
+        type: 0,
+      },
+      denim: {
+        baseColor: new THREE.Color(0x2a3d5e),
+        bands: 4.0,
+        softness: 0.55,
+        specIntensity: 0.3,
+        specShininess: 12.0,
+        specThreshold: 0.8,
+        type: 1,
+      },
+      laser: {
+        baseColor: new THREE.Color(0x0e0e0e),
+        bands: 3.0,
+        softness: 0.2,
+        specIntensity: 0.4,
+        specShininess: 24.0,
+        specThreshold: 0.7,
+        type: 2,
+      },
+    };
+
+    const uniforms = {
+      uBaseColor: { value: MATERIALS.nylon.baseColor.clone() },
+      uLightDir: { value: keyLight.position.clone().normalize() },
+      uBands: { value: MATERIALS.nylon.bands },
+      uSoftness: { value: MATERIALS.nylon.softness },
+      uSpecIntensity: { value: MATERIALS.nylon.specIntensity },
+      uSpecShininess: { value: MATERIALS.nylon.specShininess },
+      uSpecThreshold: { value: MATERIALS.nylon.specThreshold },
+      uTime: { value: 0 },
+      uMaterialType: { value: MATERIALS.nylon.type },
+    };
+
+    const material = new THREE.ShaderMaterial({
+      vertexShader,
+      fragmentShader,
+      uniforms,
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+
+    // --- Pedestal per contestualizzare lo spazio ---
+    const pedestalGeo = new THREE.CircleGeometry(2.5, 64);
+    const pedestalMat = new THREE.MeshBasicMaterial({
+      color: 0x141414,
+      transparent: true,
+      opacity: 0.4,
+    });
+    const pedestal = new THREE.Mesh(pedestalGeo, pedestalMat);
+    pedestal.rotation.x = -Math.PI / 2;
+    pedestal.position.y = -1.5;
+    scene.add(pedestal);
+
+    // --- Switch materiali ---
+    function applyMaterial(name) {
+      const m = MATERIALS[name];
+      uniforms.uBaseColor.value.copy(m.baseColor);
+      uniforms.uBands.value = m.bands;
+      uniforms.uSoftness.value = m.softness;
+      uniforms.uSpecIntensity.value = m.specIntensity;
+      uniforms.uSpecShininess.value = m.specShininess;
+      uniforms.uSpecThreshold.value = m.specThreshold;
+      uniforms.uMaterialType.value = m.type;
+    }
+
+    document.querySelectorAll('.mat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.mat-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        applyMaterial(btn.dataset.mat);
+      });
+    });
+
+    // --- Resize ---
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- Render loop + FPS counter ---
+    const fpsEl = document.getElementById('fps');
+    let lastFpsUpdate = performance.now();
+    let frames = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = performance.now() * 0.001;
+      uniforms.uTime.value = t;
+
+      mesh.rotation.y = t * 0.1; // rotazione lenta automatica
+
+      controls.update();
+      renderer.render(scene, camera);
+
+      frames++;
+      const now = performance.now();
+      if (now - lastFpsUpdate > 500) {
+        const fps = Math.round((frames * 1000) / (now - lastFpsUpdate));
+        fpsEl.textContent = fps + ' fps';
+        frames = 0;
+        lastFpsUpdate = now;
+      }
+    }
+    animate();
+  </script>
+</body>
+</html>

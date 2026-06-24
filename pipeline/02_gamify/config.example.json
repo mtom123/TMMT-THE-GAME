@@ -1,0 +1,11 @@
+{
+  "input_dir": "in",
+  "output_dir": "out",
+  "style_bible": "style_bible.md",
+  "anchors": [
+    "style_anchors/scarfvest_front.png"
+  ],
+  "draw_header": true,
+  "chain_views": true,
+  "overwrite": false
+}

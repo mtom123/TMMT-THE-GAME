@@ -1,0 +1,15 @@
+# gamify runtime
+pipeline/02_gamify/config.json
+pipeline/02_gamify/in/
+pipeline/02_gamify/out/
+pipeline/03_image_to_3d/out/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# os
+.DS_Store
+Thumbs.db

@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atelier Sferico — TMMT / Digital Atelier</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #1a1614; color: #d4d0c8;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+    canvas { display: block; }
+
+    /* Loading */
+    #loader {
+      position: fixed; inset: 0;
+      background: #1a1614;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 100;
+      transition: opacity 0.8s ease;
+    }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+    #loader .title {
+      font-size: 11px; letter-spacing: 0.4em; color: #888;
+      text-transform: uppercase; margin-bottom: 20px; font-weight: 600;
+    }
+    #loader .bar {
+      width: 200px; height: 1px; background: #333;
+      position: relative; overflow: hidden;
+    }
+    #loader .bar-fill {
+      position: absolute; top: 0; left: 0; height: 100%;
+      width: 0%; background: #d4d0c8;
+      transition: width 0.3s ease;
+    }
+
+    /* UI */
+    #ui {
+      position: fixed;
+      top: 32px; left: 32px;
+      z-index: 10;
+      max-width: 360px;
+      pointer-events: none;
+    }
+    #ui > * { pointer-events: auto; }
+
+    .brand {
+      font-size: 9px;
+      letter-spacing: 0.4em;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .title {
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      color: #d4d0c8;
+      margin-bottom: 36px;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+
+    .garment-info {
+      margin-bottom: 32px;
+      min-height: 140px;
+    }
+    .garment-code {
+      font-size: 9px;
+      letter-spacing: 0.3em;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .garment-name {
+      font-size: 28px;
+      letter-spacing: -0.01em;
+      color: #f5f2ec;
+      margin-bottom: 14px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .garment-desc {
+      font-size: 11px;
+      line-height: 1.65;
+      color: #999;
+      letter-spacing: 0.01em;
+      font-weight: 400;
+    }
+
+    .garment-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .garment-btn {
+      background: transparent;
+      border: 1px solid #2a2622;
+      color: #888;
+      padding: 13px 18px;
+      font-family: inherit;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-weight: 600;
+    }
+    .garment-btn:hover { border-color: #d4d0c8; color: #d4d0c8; background: rgba(255,255,255,0.03); }
+    .garment-btn.active { border-color: #d4d0c8; color: #d4d0c8; background: rgba(255,255,255,0.05); }
+    .garment-btn .num { font-size: 9px; color: #555; }
+    .garment-btn.active .num { color: #888; }
+
+    #info {
+      position: fixed;
+      bottom: 32px; left: 32px;
+      font-size: 9px;
+      color: #666;
+      letter-spacing: 0.15em;
+      line-height: 1.8;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    #info b { color: #d4d0c8; font-weight: 700; }
+
+    #stats {
+      position: fixed;
+      bottom: 32px; right: 32px;
+      font-size: 9px;
+      color: #666;
+      text-align: right;
+      letter-spacing: 0.2em;
+      font-weight: 600;
+    }
+
+    #vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%);
+      z-index: 5;
+    }
+
+    body { opacity: 0; transition: opacity 0.8s ease; }
+    body.loaded { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="loader">
+    <div class="title">TMMT — ATELIER SFERICO</div>
+    <div class="bar"><div class="bar-fill" id="loader-fill"></div></div>
+  </div>
+
+  <div id="ui">
+    <div class="brand">TMMT — Atelier Sferico</div>
+    <div class="title">Digital Atelier — Lookbook 3D</div>
+    <div class="garment-info">
+      <div class="garment-code" id="garment-code">Look 03 — Washed Denim</div>
+      <div class="garment-name" id="garment-name">BULK SHIRT</div>
+      <div class="garment-desc" id="garment-desc">Boxy oversized silhouette. Hand-bleached washed denim. Drop shoulders, extended hem. Front welt pockets replace traditional chest pockets.</div>
+    </div>
+    <div class="garment-buttons">
+      <button class="garment-btn active" data-garment="bulk">
+        <span class="num">01</span><span>Bulk Shirt</span>
+      </button>
+      <button class="garment-btn" data-garment="fur">
+        <span class="num">02</span><span>Bigfoot Fur Coat</span>
+      </button>
+      <button class="garment-btn" data-garment="scarf">
+        <span class="num">03</span><span>Scarf-Vest</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="info">
+    <b>Trascina</b> ruota · <b>Scroll</b> zoom · <b>H</b> nasconde UI
+  </div>
+  <div id="stats">
+    <div id="fps">— fps</div>
+  </div>
+  <div id="vignette"></div>
+  <canvas id="c"></canvas>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ================================================================
+    // ATELIER CORE — shaders + factories (inlined)
+    // ================================================================
+
+    const LIGHT_DIR = new THREE.Vector3(4, 7, 3).normalize();
+
+    const VERT_SHADER = `
+      varying vec3 vNormal;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        vNormal = normalize(normalMatrix * normal);
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPos = worldPos.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `;
+
+    const OUTLINE_VERT_SHADER = `
+      uniform float uOutlineThickness;
+      void main() {
+        vec3 displaced = position + normal * uOutlineThickness;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+      }
+    `;
+
+    const FUR_VERT_SHADER = `
+      uniform float uShellOffset;
+      varying vec3 vNormal;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        vec3 displaced = position + normal * uShellOffset;
+        vNormal = normalize(normalMatrix * normal);
+        vec4 worldPos = modelMatrix * vec4(displaced, 1.0);
+        vWorldPos = worldPos.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `;
+
+    const FRAG_SHADER = `
+      precision highp float;
+      varying vec3 vNormal;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+
+      uniform vec3  uBaseColor;
+      uniform vec3  uShadowColor;
+      uniform vec3  uLightDir;
+      uniform float uBands;
+      uniform float uSpecIntensity;
+      uniform float uSpecShininess;
+      uniform float uSpecThreshold;
+      uniform int   uMaterialType;       // 0 nylon, 1 denim, 2 laser, 3 fur
+      uniform float uShellIndex;
+      uniform float uShellCount;
+
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+      }
+      float noise(vec2 p) {
+        vec2 i = floor(p); vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x),
+                   mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+      }
+      float fbm(vec2 p) {
+        float v = 0.0; float a = 0.5;
+        for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.0; a *= 0.5; }
+        return v;
+      }
+
+      void main() {
+        vec3 N = normalize(vNormal);
+        vec3 L = normalize(uLightDir);
+        float NdotL = dot(N, L);
+
+        float shade = NdotL * 0.5 + 0.5;
+        float band = floor(shade * uBands) / uBands;
+        band = clamp(band, 0.0, 1.0);
+
+        vec3 color = mix(uShadowColor, uBaseColor, band);
+        float alpha = 1.0;
+        vec3 V = normalize(cameraPosition - vWorldPos);
+
+        if (uMaterialType == 0) {
+          vec3 H = normalize(L + V);
+          float spec = pow(max(dot(N, H), 0.0), uSpecShininess);
+          spec = step(uSpecThreshold, spec);
+          color += vec3(spec) * uSpecIntensity;
+        } else if (uMaterialType == 1) {
+          float weave = sin(vUv.y * 220.0) * 0.5 + 0.5;
+          weave = mix(0.93, 1.0, weave);
+          float fabNoise = fbm(vUv * 6.0);
+          float bleach = fbm(vUv * 2.5);
+          bleach = smoothstep(0.4, 0.65, bleach);
+          vec3 bleached = mix(uBaseColor, uBaseColor * 1.8 + vec3(0.08, 0.09, 0.1), 0.7);
+          vec3 base = mix(uBaseColor, bleached, bleach) * weave * mix(0.85, 1.15, fabNoise);
+          color = mix(uShadowColor, base, band);
+          vec3 H = normalize(L + V);
+          float spec = pow(max(dot(N, H), 0.0), uSpecShininess);
+          color += vec3(spec) * uSpecIntensity * 0.3;
+        } else if (uMaterialType == 2) {
+          float engrave = fbm(vUv * 35.0);
+          float mask = smoothstep(0.48, 0.52, engrave);
+          vec3 fakeN = N;
+          float p = (engrave - 0.5) * 0.7;
+          fakeN.xy += vec2(p, -p * 0.7);
+          fakeN = normalize(fakeN);
+          float eShade = dot(fakeN, L) * 0.5 + 0.5;
+          float eBand = floor(eShade * uBands) / uBands;
+          vec3 lightC = mix(uShadowColor, uBaseColor, band);
+          vec3 darkC = mix(uShadowColor * 0.4, uBaseColor * 0.4, eBand);
+          color = mix(lightC, darkC, mask);
+        } else if (uMaterialType == 3) {
+          float strandN = fbm(vUv * 60.0 + uShellIndex * 0.5);
+          float strands = smoothstep(0.3, 0.65, strandN);
+          float shellProg = uShellIndex / uShellCount;
+          float shellFade = 1.0 - shellProg * 0.85;
+          alpha = strands * shellFade;
+          vec3 innerC = uBaseColor * 0.65;
+          vec3 outerC = uBaseColor * 1.25;
+          vec3 furC = mix(innerC, outerC, shellProg);
+          furC *= mix(0.8, 1.2, strandN);
+          color = mix(uShadowColor * 0.7, furC, band);
+        }
+
+        color = pow(color, vec3(1.0 / 2.2));
+        gl_FragColor = vec4(color, alpha);
+      }
+    `;
+
+    const OUTLINE_FRAG_SHADER = `
+      precision highp float;
+      uniform vec3 uOutlineColor;
+      void main() {
+        gl_FragColor = vec4(uOutlineColor, 1.0);
+      }
+    `;
+
+    const MATERIAL_PRESETS = {
+      denim: {
+        baseColor: new THREE.Color(0x3a5070),
+        shadowColor: new THREE.Color(0x1a2535),
+        bands: 3.0,
+        specIntensity: 0.3, specShininess: 12.0, specThreshold: 0.85,
+        type: 1, isFur: false,
+      },
+      nylon: {
+        baseColor: new THREE.Color(0x2a2a2a),
+        shadowColor: new THREE.Color(0x0a0a0a),
+        bands: 3.0,
+        specIntensity: 1.8, specShininess: 80.0, specThreshold: 0.55,
+        type: 0, isFur: false,
+      },
+      nylonLight: {
+        baseColor: new THREE.Color(0x383838),
+        shadowColor: new THREE.Color(0x141414),
+        bands: 3.0,
+        specIntensity: 1.6, specShininess: 70.0, specThreshold: 0.55,
+        type: 0, isFur: false,
+      },
+      laser: {
+        baseColor: new THREE.Color(0x141414),
+        shadowColor: new THREE.Color(0x050505),
+        bands: 3.0,
+        specIntensity: 0.5, specShininess: 24.0, specThreshold: 0.7,
+        type: 2, isFur: false,
+      },
+      fur: {
+        baseColor: new THREE.Color(0xc8b896),
+        shadowColor: new THREE.Color(0x4a4030),
+        bands: 3.0,
+        specIntensity: 0.1, specShininess: 8.0, specThreshold: 0.9,
+        type: 3, isFur: true,
+        shellCount: 14, shellSpacing: 0.014,
+      },
+      wood: {
+        baseColor: new THREE.Color(0x6b4a2c),
+        shadowColor: new THREE.Color(0x2a1a0c),
+        bands: 3.0,
+        specIntensity: 0.2, specShininess: 12.0, specThreshold: 0.85,
+        type: 0, isFur: false,
+      },
+      lightWood: {
+        baseColor: new THREE.Color(0xa89070),
+        shadowColor: new THREE.Color(0x4a3a28),
+        bands: 3.0,
+        specIntensity: 0.15, specShininess: 10.0, specThreshold: 0.85,
+        type: 0, isFur: false,
+      },
+      silver: {
+        baseColor: new THREE.Color(0xb0b0b0),
+        shadowColor: new THREE.Color(0x404040),
+        bands: 3.0,
+        specIntensity: 2.5, specShininess: 100.0, specThreshold: 0.55,
+        type: 0, isFur: false,
+      },
+      concrete: {
+        baseColor: new THREE.Color(0x807a72),
+        shadowColor: new THREE.Color(0x38332c),
+        bands: 3.0,
+        specIntensity: 0.05, specShininess: 8.0, specThreshold: 0.9,
+        type: 0, isFur: false,
+      },
+      plaster: {
+        baseColor: new THREE.Color(0xd8cab0),
+        shadowColor: new THREE.Color(0x6a5d44),
+        bands: 3.0,
+        specIntensity: 0.08, specShininess: 8.0, specThreshold: 0.9,
+        type: 0, isFur: false,
+      },
+    };
+
+    function createShaderMaterial(presetKey, overrides = {}) {
+      const preset = MATERIAL_PRESETS[presetKey];
+      if (!preset) throw new Error(`Unknown material preset: ${presetKey}`);
+      const params = { ...preset, ...overrides };
+      return new THREE.ShaderMaterial({
+        vertexShader: VERT_SHADER,
+        fragmentShader: FRAG_SHADER,
+        uniforms: {
+          uBaseColor:     { value: params.baseColor.clone() },
+          uShadowColor:   { value: params.shadowColor.clone() },
+          uLightDir:      { value: LIGHT_DIR.clone() },
+          uBands:         { value: params.bands },
+          uSpecIntensity: { value: params.specIntensity },
+          uSpecShininess: { value: params.specShininess },
+          uSpecThreshold: { value: params.specThreshold },
+          uMaterialType:  { value: params.type },
+          uShellIndex:    { value: 0 },
+          uShellCount:    { value: 1 },
+        },
+      });
+    }
+
+    function createOutline(geometry, thickness = 0.025, color = 0x000000) {
+      const outlineMat = new THREE.ShaderMaterial({
+        vertexShader: OUTLINE_VERT_SHADER,
+        fragmentShader: OUTLINE_FRAG_SHADER,
+        uniforms: {
+          uOutlineThickness: { value: thickness },
+          uOutlineColor: { value: new THREE.Color(color) },
+        },
+        side: THREE.BackSide,
+        depthWrite: true,
+      });
+      const outline = new THREE.Mesh(geometry, outlineMat);
+      outline.renderOrder = -1;
+      return outline;
+    }
+
+    function applyPuffy(geo, amount, freq) {
+      geo.computeVertexNormals();
+      const pos = geo.attributes.position;
+      const nor = geo.attributes.normal;
+      const v = new THREE.Vector3();
+      const n = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        n.fromBufferAttribute(nor, i);
+        const ns =
+          Math.sin(v.x * freq) * Math.cos(v.y * freq * 1.3 + v.z * 0.5) * 0.5 +
+          Math.sin(v.z * freq * 0.8 + v.y * freq * 0.5) * 0.5;
+        v.addScaledVector(n, ns * amount);
+        pos.setXYZ(i, v.x, v.y, v.z);
+      }
+      pos.needsUpdate = true;
+      geo.computeVertexNormals();
+    }
+
+    function buildFurShells(geometry, presetKey = 'fur') {
+      const preset = MATERIAL_PRESETS[presetKey];
+      const shellCount = preset.shellCount;
+      const spacing = preset.shellSpacing;
+      const group = new THREE.Group();
+
+      const mat0 = new THREE.ShaderMaterial({
+        vertexShader: VERT_SHADER,
+        fragmentShader: FRAG_SHADER,
+        uniforms: {
+          uBaseColor:     { value: preset.baseColor.clone() },
+          uShadowColor:   { value: preset.shadowColor.clone() },
+          uLightDir:      { value: LIGHT_DIR.clone() },
+          uBands:         { value: preset.bands },
+          uSpecIntensity: { value: preset.specIntensity },
+          uSpecShininess: { value: preset.specShininess },
+          uSpecThreshold: { value: preset.specThreshold },
+          uMaterialType:  { value: 3 },
+          uShellIndex:    { value: 0 },
+          uShellCount:    { value: shellCount },
+        },
+      });
+      const shell0 = new THREE.Mesh(geometry, mat0);
+      shell0.renderOrder = 0;
+      group.add(shell0);
+
+      for (let i = 1; i < shellCount; i++) {
+        const mat = new THREE.ShaderMaterial({
+          vertexShader: FUR_VERT_SHADER,
+          fragmentShader: FRAG_SHADER,
+          transparent: true,
+          depthWrite: false,
+          uniforms: {
+            uBaseColor:     { value: preset.baseColor.clone() },
+            uShadowColor:   { value: preset.shadowColor.clone() },
+            uLightDir:      { value: LIGHT_DIR.clone() },
+            uBands:         { value: preset.bands },
+            uSpecIntensity: { value: preset.specIntensity },
+            uSpecShininess: { value: preset.specShininess },
+            uSpecThreshold: { value: preset.specThreshold },
+            uMaterialType:  { value: 3 },
+            uShellIndex:    { value: i },
+            uShellCount:    { value: shellCount },
+            uShellOffset:   { value: i * spacing },
+          },
+        });
+        const shell = new THREE.Mesh(geometry, mat);
+        shell.renderOrder = i;
+        group.add(shell);
+      }
+      return group;
+    }
+
+    function makePart(geometry, position, rotation, mat, thickness = 0.018) {
+      const sub = new THREE.Group();
+      const mesh = new THREE.Mesh(geometry, mat);
+      sub.add(mesh);
+      sub.add(createOutline(geometry, thickness));
+      sub.position.copy(position);
+      if (rotation) sub.rotation.copy(rotation);
+      return sub;
+    }
+
+    // ================================================================
+    // MANNEQUIN (fashion proportions, editorial pose)
+    // ================================================================
+    function createMannequin() {
+      const group = new THREE.Group();
+      group.name = 'mannequin';
+
+      const skinMat = createShaderMaterial('nylon', {
+        baseColor: new THREE.Color(0x6a5a4a),
+        shadowColor: new THREE.Color(0x2a2218),
+        specIntensity: 0.2,
+      });
+
+      function mp(geometry, position, rotation, thickness = 0.018) {
+        return makePart(geometry, position, rotation, skinMat, thickness);
+      }
+
+      // Right leg (weight-bearing)
+      group.add(mp(new THREE.CylinderGeometry(0.105, 0.09, 0.95, 14, 8), new THREE.Vector3(0.13, 2.55, 0)));
+      group.add(mp(new THREE.CylinderGeometry(0.085, 0.06, 0.95, 14, 8), new THREE.Vector3(0.13, 1.55, 0.02)));
+      group.add(mp(new THREE.BoxGeometry(0.13, 0.07, 0.27), new THREE.Vector3(0.13, 0.06, 0.06)));
+
+      // Left leg (relaxed)
+      group.add(mp(new THREE.CylinderGeometry(0.105, 0.09, 0.95, 14, 8), new THREE.Vector3(-0.14, 2.55, 0), new THREE.Euler(0, 0, -0.04)));
+      group.add(mp(new THREE.CylinderGeometry(0.085, 0.06, 0.92, 14, 8), new THREE.Vector3(-0.16, 1.56, 0.02), new THREE.Euler(0, 0, 0.04)));
+      group.add(mp(new THREE.BoxGeometry(0.13, 0.07, 0.27), new THREE.Vector3(-0.17, 0.06, 0.06)));
+
+      // Pelvis
+      const pelvisGeo = new THREE.BoxGeometry(0.45, 0.28, 0.32, 8, 6, 6);
+      applyPuffy(pelvisGeo, 0.012, 4.0);
+      group.add(mp(pelvisGeo, new THREE.Vector3(0, 3.05, 0), null, 0.02));
+
+      // Torso
+      const torsoGeo = new THREE.CylinderGeometry(0.21, 0.24, 1.15, 18, 12);
+      applyPuffy(torsoGeo, 0.015, 3.5);
+      group.add(mp(torsoGeo, new THREE.Vector3(0, 3.7, 0), null, 0.02));
+
+      // Chest
+      const chestGeo = new THREE.BoxGeometry(0.42, 0.32, 0.3, 8, 6, 6);
+      applyPuffy(chestGeo, 0.018, 3.5);
+      group.add(mp(chestGeo, new THREE.Vector3(0, 4.15, 0.02), null, 0.02));
+
+      // Shoulders
+      const shoulderGeo = new THREE.BoxGeometry(0.72, 0.18, 0.32, 10, 4, 6);
+      applyPuffy(shoulderGeo, 0.018, 3.5);
+      group.add(mp(shoulderGeo, new THREE.Vector3(0, 4.4, 0), null, 0.022));
+
+      // Neck + head
+      group.add(mp(new THREE.CylinderGeometry(0.085, 0.1, 0.22, 12, 4), new THREE.Vector3(0, 4.6, 0)));
+      const headGeo = new THREE.SphereGeometry(0.16, 18, 16);
+      const hp = headGeo.attributes.position;
+      for (let i = 0; i < hp.count; i++) hp.setY(i, hp.getY(i) * 1.15);
+      hp.needsUpdate = true;
+      headGeo.computeVertexNormals();
+      group.add(mp(headGeo, new THREE.Vector3(0, 4.85, 0.01), null, 0.018));
+
+      // Arms
+      group.add(mp(new THREE.CylinderGeometry(0.062, 0.055, 0.65, 10, 6), new THREE.Vector3(0.43, 4.05, 0), new THREE.Euler(0, 0, -0.1)));
+      group.add(mp(new THREE.CylinderGeometry(0.055, 0.05, 0.65, 10, 6), new THREE.Vector3(0.49, 3.4, 0.02), new THREE.Euler(0, 0, -0.06)));
+      group.add(mp(new THREE.BoxGeometry(0.08, 0.13, 0.05), new THREE.Vector3(0.51, 3.0, 0.04), null, 0.014));
+      group.add(mp(new THREE.CylinderGeometry(0.062, 0.055, 0.65, 10, 6), new THREE.Vector3(-0.43, 4.05, 0), new THREE.Euler(0, 0, 0.1)));
+      group.add(mp(new THREE.CylinderGeometry(0.055, 0.05, 0.65, 10, 6), new THREE.Vector3(-0.49, 3.4, 0.02), new THREE.Euler(0, 0, 0.06)));
+      group.add(mp(new THREE.BoxGeometry(0.08, 0.13, 0.05), new THREE.Vector3(-0.51, 3.0, 0.04), null, 0.014));
+
+      group.scale.setScalar(0.78);
+      group.position.y = -0.05;
+      return group;
+    }
+
+    // ================================================================
+    // BULK SHIRT (inlined from subagent output)
+    // ================================================================
+    function createBulkShirt() {
+      const group = new THREE.Group();
+      group.name = 'bulk-shirt';
+
+      const denimMat = createShaderMaterial('denim');
+      const buttonMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x161616) });
+
+      function mp(geometry, position, rotation, mat = denimMat, thickness = 0.022) {
+        return makePart(geometry, position, rotation, mat, thickness);
+      }
+
+      // Torso body — boxy, oversized
+      const torsoGeo = new THREE.BoxGeometry(0.55, 1.70, 0.36, 8, 14, 6);
+      applyPuffy(torsoGeo, 0.014, 4.0);
+      group.add(mp(torsoGeo, new THREE.Vector3(0, 2.55, 0)));
+
+      // Back yoke
+      const yokeGeo = new THREE.BoxGeometry(0.50, 0.12, 0.04);
+      group.add(mp(yokeGeo, new THREE.Vector3(0, 3.25, -0.20)));
+
+      // Sleeves (drop shoulder)
+      const sleeveGeo = new THREE.CylinderGeometry(0.085, 0.078, 0.80, 14, 6);
+      applyPuffy(sleeveGeo, 0.008, 5.0);
+      group.add(mp(sleeveGeo, new THREE.Vector3(0.3625, 2.80, 0), new THREE.Euler(0, 0, 0.069)));
+      group.add(mp(sleeveGeo.clone(), new THREE.Vector3(-0.3625, 2.80, 0), new THREE.Euler(0, 0, -0.069)));
+
+      // Cuffs
+      const cuffGeo = new THREE.CylinderGeometry(0.092, 0.092, 0.06, 14);
+      group.add(mp(cuffGeo, new THREE.Vector3(0.39, 2.40, 0), new THREE.Euler(0, 0, 0.069), denimMat, 0.016));
+      group.add(mp(cuffGeo.clone(), new THREE.Vector3(-0.39, 2.40, 0), new THREE.Euler(0, 0, -0.069), denimMat, 0.016));
+
+      // Collar leaves
+      const collarGeo = new THREE.BoxGeometry(0.15, 0.025, 0.10);
+      group.add(mp(collarGeo, new THREE.Vector3(0.075, 3.45, 0.04), new THREE.Euler(0.30, -0.40, 0)));
+      group.add(mp(collarGeo.clone(), new THREE.Vector3(-0.075, 3.45, 0.04), new THREE.Euler(0.30, 0.40, 0)));
+
+      // Placket
+      const placketGeo = new THREE.BoxGeometry(0.06, 1.50, 0.022);
+      group.add(mp(placketGeo, new THREE.Vector3(0, 2.65, 0.205)));
+
+      // Buttons
+      const buttonGeo = new THREE.SphereGeometry(0.022, 10, 8);
+      const bp = buttonGeo.attributes.position;
+      for (let i = 0; i < bp.count; i++) bp.setY(i, bp.getY(i) * 0.65);
+      bp.needsUpdate = true;
+      buttonGeo.computeVertexNormals();
+      [3.20, 2.90, 2.60, 2.30, 2.00].forEach(y => {
+        group.add(mp(buttonGeo.clone(), new THREE.Vector3(0, y, 0.225), null, buttonMat, 0.010));
+      });
+
+      // Welt pockets
+      const pocketGeo = new THREE.BoxGeometry(0.16, 0.025, 0.028);
+      group.add(mp(pocketGeo, new THREE.Vector3(0.15, 2.40, 0.205), new THREE.Euler(0, 0, -0.12)));
+      group.add(mp(pocketGeo.clone(), new THREE.Vector3(-0.15, 2.40, 0.205), new THREE.Euler(0, 0, 0.12)));
+
+      // Hem detail
+      const hemGeo = new THREE.BoxGeometry(0.565, 0.07, 0.375);
+      group.add(mp(hemGeo, new THREE.Vector3(0, 1.74, 0)));
+
+      return group;
+    }
+
+    // ================================================================
+    // BIGFOOT FUR COAT (inlined)
+    // ================================================================
+    function createFurCoat() {
+      const group = new THREE.Group();
+      group.name = 'fur-coat';
+
+      const liningMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x1a1a1a) });
+
+      // Coat body — two halves with open front gap
+      const bodyHalfGeo = new THREE.BoxGeometry(0.395, 2.40, 0.55, 6, 12, 6);
+      applyPuffy(bodyHalfGeo, 0.025, 3.0);
+
+      const rightBody = buildFurShells(bodyHalfGeo.clone(), 'fur');
+      rightBody.position.set(0.2275, 2.40, 0);
+      group.add(rightBody);
+
+      const leftBody = buildFurShells(bodyHalfGeo.clone(), 'fur');
+      leftBody.position.set(-0.2275, 2.40, 0);
+      group.add(leftBody);
+
+      // Sleeves
+      const sleeveGeo = new THREE.CylinderGeometry(0.18, 0.15, 1.10, 16, 8);
+      applyPuffy(sleeveGeo, 0.025, 3.0);
+
+      const rightSleeve = buildFurShells(sleeveGeo.clone(), 'fur');
+      rightSleeve.position.set(0.42, 2.65, 0);
+      rightSleeve.rotation.z = 0.064;
+      group.add(rightSleeve);
+
+      const leftSleeve = buildFurShells(sleeveGeo.clone(), 'fur');
+      leftSleeve.position.set(-0.42, 2.65, 0);
+      leftSleeve.rotation.z = -0.064;
+      group.add(leftSleeve);
+
+      // Shawl collar — two angled plates
+      const collarGeo = new THREE.BoxGeometry(0.10, 0.78, 0.10, 4, 6, 3);
+      applyPuffy(collarGeo, 0.022, 3.5);
+
+      const rightCollar = buildFurShells(collarGeo.clone(), 'fur');
+      rightCollar.position.set(0.18, 3.17, 0.32);
+      rightCollar.rotation.z = -0.25;
+      group.add(rightCollar);
+
+      const leftCollar = buildFurShells(collarGeo.clone(), 'fur');
+      leftCollar.position.set(-0.18, 3.17, 0.32);
+      leftCollar.rotation.z = 0.25;
+      group.add(leftCollar);
+
+      // Inner lining
+      const liningGeo = new THREE.BoxGeometry(0.04, 2.0, 0.5);
+      group.add(makePart(liningGeo, new THREE.Vector3(0, 2.4, 0), null, liningMat, 0.018));
+
+      return group;
+    }
+
+    // ================================================================
+    // SCARF-VEST (inlined)
+    // ================================================================
+    function createScarfVest() {
+      const group = new THREE.Group();
+      group.name = 'scarf-vest';
+
+      const nylonMat = createShaderMaterial('nylon');
+      const nylonLightMat = createShaderMaterial('nylonLight');
+      const darkMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x0a0a0a) });
+
+      function mp(geometry, position, rotation, mat, thickness = 0.022) {
+        return makePart(geometry, position, rotation, mat, thickness);
+      }
+
+      // Vest torso
+      const vestGeo = new THREE.BoxGeometry(0.55, 1.0, 0.42, 8, 12, 8);
+      applyPuffy(vestGeo, 0.06, 4.0);
+      group.add(mp(vestGeo, new THREE.Vector3(0, 2.50, 0), null, nylonMat));
+
+      // Yoke
+      const yokeGeo = new THREE.BoxGeometry(0.66, 0.13, 0.42);
+      applyPuffy(yokeGeo, 0.025, 4.0);
+      group.add(mp(yokeGeo, new THREE.Vector3(0, 3.065, 0), null, nylonMat));
+
+      // Hem
+      const hemGeo = new THREE.BoxGeometry(0.60, 0.08, 0.44);
+      applyPuffy(hemGeo, 0.022, 4.0);
+      group.add(mp(hemGeo, new THREE.Vector3(0, 2.0, 0), null, nylonMat));
+
+      // Zipper
+      group.add(mp(new THREE.BoxGeometry(0.018, 0.85, 0.015), new THREE.Vector3(0, 2.575, 0.235), null, darkMat, 0.010));
+      group.add(mp(new THREE.BoxGeometry(0.035, 0.05, 0.022), new THREE.Vector3(0, 3.02, 0.255), null, darkMat, 0.010));
+
+      // Quilting seams
+      const seamGeo = new THREE.BoxGeometry(0.008, 0.75, 0.012);
+      group.add(mp(seamGeo, new THREE.Vector3(0.15, 2.55, 0.235), null, darkMat, 0.008));
+      group.add(mp(seamGeo.clone(), new THREE.Vector3(-0.15, 2.55, 0.235), null, darkMat, 0.008));
+
+      // Scarf tube
+      const scarfCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0.28, 1.40, 0.12),
+        new THREE.Vector3(0.30, 2.00, 0.13),
+        new THREE.Vector3(0.305, 3.305, 0.185),
+        new THREE.Vector3(0.30, 3.30, 0.18),
+        new THREE.Vector3(0.12, 3.25, 0.22),
+        new THREE.Vector3(-0.15, 3.25, 0.22),
+        new THREE.Vector3(-0.20, 3.30, 0.20),
+        new THREE.Vector3(-0.22, 3.30, -0.18),
+        new THREE.Vector3(-0.20, 3.25, -0.20),
+        new THREE.Vector3(0.0, 3.25, -0.22),
+        new THREE.Vector3(0.20, 3.25, -0.18),
+        new THREE.Vector3(0.30, 3.20, -0.10),
+        new THREE.Vector3(0.32, 3.15, 0.08),
+        new THREE.Vector3(0.20, 3.15, 0.22),
+        new THREE.Vector3(0.0, 3.18, 0.25),
+        new THREE.Vector3(-0.20, 3.15, 0.18),
+        new THREE.Vector3(-0.30, 3.10, 0.08),
+        new THREE.Vector3(-0.32, 2.60, 0.06),
+        new THREE.Vector3(-0.32, 2.00, 0.04),
+      ]);
+      const scarfGeo = new THREE.TubeGeometry(scarfCurve, 120, 0.10, 12, false);
+      applyPuffy(scarfGeo, 0.025, 5.0);
+      group.add(mp(scarfGeo, new THREE.Vector3(0,0,0), null, nylonLightMat, 0.018));
+
+      // End caps
+      const capGeo = new THREE.SphereGeometry(0.105, 16, 12);
+      applyPuffy(capGeo, 0.02, 5.0);
+      group.add(mp(capGeo.clone(), new THREE.Vector3(0.28, 1.40, 0.12), null, nylonLightMat, 0.018));
+      group.add(mp(capGeo.clone(), new THREE.Vector3(-0.32, 2.00, 0.04), null, nylonLightMat, 0.018));
+
+      // Collar points
+      const collarGeo = new THREE.BoxGeometry(0.10, 0.05, 0.12);
+      applyPuffy(collarGeo, 0.008, 5.0);
+      group.add(mp(collarGeo.clone(), new THREE.Vector3(0.22, 3.08, 0.12), new THREE.Euler(0, 0, -0.2), nylonMat, 0.018));
+      group.add(mp(collarGeo.clone(), new THREE.Vector3(-0.22, 3.08, 0.12), new THREE.Euler(0, 0, 0.2), nylonMat, 0.018));
+
+      return group;
+    }
+
+    // ================================================================
+    // SEWING STATION (inlined)
+    // ================================================================
+    function createSewingStation() {
+      const group = new THREE.Group();
+      group.name = 'sewing-station';
+
+      const woodMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x6b4a2c), shadowColor: new THREE.Color(0x2a1a0c), specIntensity: 0.2 });
+      const blackMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x0a0a0a) });
+      const silverMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0xcccccc), specIntensity: 2.0, specShininess: 100 });
+      const redMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x8b2820), shadowColor: new THREE.Color(0x2a0808) });
+
+      function mp(geometry, position, rotation, mat, thickness = 0.018) {
+        return makePart(geometry, position, rotation, mat, thickness);
+      }
+
+      // Table top
+      const tableGeo = new THREE.BoxGeometry(0.7, 0.04, 1.6);
+      applyPuffy(tableGeo, 0.003, 6.0);
+      group.add(mp(tableGeo, new THREE.Vector3(0, 0.75, 0), null, woodMat, 0.018));
+
+      // Table legs
+      const legGeo = new THREE.BoxGeometry(0.06, 0.75, 0.06);
+      [[0.30, 0.37], [0.30, -0.37], [-0.30, 0.37], [-0.30, -0.37]].forEach(([x,z]) => {
+        group.add(mp(legGeo.clone(), new THREE.Vector3(x, 0.375, z), null, woodMat, 0.016));
+      });
+
+      // Machine body
+      const bodyGeo = new THREE.BoxGeometry(0.3, 0.35, 0.5, 4, 4, 4);
+      applyPuffy(bodyGeo, 0.012, 4.0);
+      group.add(mp(bodyGeo, new THREE.Vector3(0, 0.94, 0), null, blackMat, 0.018));
+
+      // Arm
+      const armGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.3, 12);
+      group.add(mp(armGeo, new THREE.Vector3(0, 1.02, -0.20), new THREE.Euler(Math.PI/2, 0, 0), blackMat, 0.014));
+
+      // Needle housing
+      group.add(mp(new THREE.BoxGeometry(0.05, 0.1, 0.05), new THREE.Vector3(0, 0.91, -0.20), null, blackMat, 0.012));
+
+      // Needle
+      group.add(mp(new THREE.CylinderGeometry(0.005, 0.005, 0.08, 6), new THREE.Vector3(0, 0.83, -0.20), null, silverMat, 0.008));
+
+      // Thread spool
+      group.add(mp(new THREE.CylinderGeometry(0.04, 0.04, 0.08, 12), new THREE.Vector3(0.15, 1.18, 0.10), null, redMat, 0.012));
+
+      // Spool pin
+      group.add(mp(new THREE.CylinderGeometry(0.005, 0.005, 0.15, 6), new THREE.Vector3(0.15, 1.07, 0.10), null, silverMat, 0.010));
+
+      // Handwheel
+      group.add(mp(new THREE.TorusGeometry(0.07, 0.012, 8, 16), new THREE.Vector3(0, 1.02, 0.26), new THREE.Euler(0, Math.PI/2, 0), silverMat, 0.012));
+
+      // Base plate
+      group.add(mp(new THREE.BoxGeometry(0.1, 0.02, 0.2), new THREE.Vector3(0, 0.78, -0.05), null, blackMat, 0.012));
+
+      // Presser foot
+      group.add(mp(new THREE.BoxGeometry(0.04, 0.04, 0.06), new THREE.Vector3(0, 0.80, -0.18), new THREE.Euler(0, 0, 0.1), blackMat, 0.010));
+
+      // Chair
+      group.add(mp(new THREE.BoxGeometry(0.4, 0.04, 0.4), new THREE.Vector3(-0.6, 0.45, 0), null, woodMat, 0.018));
+      [[-0.43, 0.18], [-0.43, -0.18], [-0.77, 0.18], [-0.77, -0.18]].forEach(([x,z]) => {
+        group.add(mp(new THREE.BoxGeometry(0.04, 0.45, 0.04), new THREE.Vector3(x, 0.225, z), null, woodMat, 0.012));
+      });
+      group.add(mp(new THREE.BoxGeometry(0.04, 0.4, 0.4), new THREE.Vector3(-0.80, 0.65, 0), new THREE.Euler(0, 0, 0.1), woodMat, 0.018));
+
+      // Waste basket
+      group.add(mp(new THREE.CylinderGeometry(0.09, 0.07, 0.12, 12), new THREE.Vector3(-0.45, 0.06, 0.7), null, redMat, 0.014));
+
+      group.position.set(-3.5, 0, 2);
+      group.rotation.y = Math.PI * 0.3;
+      return group;
+    }
+
+    // ================================================================
+    // CUTTING TABLE (inlined)
+    // ================================================================
+    function createCuttingTable() {
+      const group = new THREE.Group();
+      group.name = 'cutting-table';
+
+      const tableMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0xa89070), shadowColor: new THREE.Color(0x4a3a28), specIntensity: 0.15 });
+      const woodMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x6b4a2c), shadowColor: new THREE.Color(0x2a1a0c) });
+      const silverMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0xb0b0b0), specIntensity: 2.0, specShininess: 80 });
+      const blackMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x101010) });
+      const creamMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0xe8e0c8), shadowColor: new THREE.Color(0xa89878), specIntensity: 0.05 });
+      const tanMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0xb89868), shadowColor: new THREE.Color(0x4a3a20) });
+      const denimMat = createShaderMaterial('denim');
+      const redMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x8b2820), shadowColor: new THREE.Color(0x2a0808) });
+      const yellowMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0xc8b040), shadowColor: new THREE.Color(0x4a3a10) });
+
+      function mp(geometry, position, rotation, mat, thickness = 0.014) {
+        return makePart(geometry, position, rotation, mat, thickness);
+      }
+
+      // Table top
+      const tableGeo = new THREE.BoxGeometry(1.0, 0.05, 2.4);
+      applyPuffy(tableGeo, 0.003, 40);
+      group.add(mp(tableGeo, new THREE.Vector3(0, 0.85, 0), null, tableMat, 0.018));
+
+      // 6 legs
+      const legGeo = new THREE.BoxGeometry(0.08, 0.85, 0.08);
+      [[0.42, 1.10], [0.42, -1.10], [-0.42, 1.10], [-0.42, -1.10], [0.42, 0], [-0.42, 0]].forEach(([x,z]) => {
+        group.add(mp(legGeo.clone(), new THREE.Vector3(x, 0.425, z), null, tableMat, 0.014));
+      });
+
+      // Lower shelf
+      group.add(mp(new THREE.BoxGeometry(0.7, 0.02, 2.0), new THREE.Vector3(0, 0.15, 0), null, tableMat, 0.012));
+
+      // Fabric piece
+      const fabricGeo = new THREE.BoxGeometry(0.7, 0.02, 1.6);
+      applyPuffy(fabricGeo, 0.005, 8);
+      group.add(mp(fabricGeo, new THREE.Vector3(0, 0.885, -0.2), null, denimMat, 0.012));
+
+      // Pattern paper
+      group.add(mp(new THREE.BoxGeometry(0.5, 0.005, 1.0), new THREE.Vector3(0, 0.895, 0.1), null, creamMat, 0.008));
+
+      // Scraps
+      const scrap1 = new THREE.BoxGeometry(0.3, 0.01, 0.25);
+      group.add(mp(scrap1, new THREE.Vector3(-0.3, 0.88, 0.7), new THREE.Euler(0, 0.3, 0), tanMat, 0.010));
+      group.add(mp(new THREE.BoxGeometry(0.2, 0.01, 0.18), new THREE.Vector3(0.35, 0.88, -0.95), new THREE.Euler(0, -0.4, 0), tanMat, 0.010));
+
+      // Shears (sub-group)
+      const shears = new THREE.Group();
+      const bladeGeo = new THREE.BoxGeometry(0.02, 0.015, 0.2);
+      shears.add(makePart(bladeGeo, new THREE.Vector3(-0.015, 0, 0.1), new THREE.Euler(0, 0, 0.15), silverMat, 0.010));
+      shears.add(makePart(bladeGeo.clone(), new THREE.Vector3(0.015, 0, 0.1), new THREE.Euler(0, 0, -0.15), silverMat, 0.010));
+      shears.add(makePart(new THREE.TorusGeometry(0.04, 0.012, 8, 16), new THREE.Vector3(-0.025, 0, -0.05), null, blackMat, 0.010));
+      shears.add(makePart(new THREE.TorusGeometry(0.04, 0.012, 8, 16), new THREE.Vector3(0.025, 0, -0.05), null, blackMat, 0.010));
+      shears.position.set(-0.35, 0.885, 1.0);
+      group.add(shears);
+
+      // Chalk
+      group.add(mp(new THREE.BoxGeometry(0.04, 0.04, 0.04), new THREE.Vector3(0.28, 0.915, 0.4), new THREE.Euler(0.1, 0.3, 0.2), creamMat, 0.008));
+
+      // Ruler
+      group.add(mp(new THREE.BoxGeometry(0.06, 0.02, 1.2), new THREE.Vector3(-0.25, 0.886, -0.5), null, woodMat, 0.010));
+
+      // Rotary cutter
+      group.add(mp(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 10), new THREE.Vector3(0.35, 0.935, -0.05), new THREE.Euler(0, 0, Math.PI/2), blackMat, 0.012));
+      group.add(mp(new THREE.CylinderGeometry(0.06, 0.06, 0.005, 16), new THREE.Vector3(0.35, 0.935, -0.20), new THREE.Euler(Math.PI/2, 0, 0), silverMat, 0.010));
+
+      // Pin cushion + pins
+      const cushionGeo = new THREE.SphereGeometry(0.05, 12, 8);
+      cushionGeo.scale(1, 0.7, 1);
+      group.add(mp(cushionGeo, new THREE.Vector3(-0.4, 0.91, -0.9), null, redMat, 0.012));
+      for (let i = 0; i < 6; i++) {
+        const dir = new THREE.Vector3(
+          (Math.random() - 0.5) * 0.8,
+          Math.random() * 0.9 + 0.4,
+          (Math.random() - 0.5) * 0.8
+        ).normalize();
+        const pos = new THREE.Vector3(-0.4, 0.94, -0.9).addScaledVector(dir, 0.05);
+        const pin = new THREE.CylinderGeometry(0.0015, 0.0015, 0.04, 4);
+        const q = new THREE.Quaternion();
+        q.setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
+        group.add(mp(pin, pos, new THREE.Euler().setFromQuaternion(q), silverMat, 0.005));
+      }
+
+      // Thread spool
+      group.add(mp(new THREE.CylinderGeometry(0.05, 0.05, 0.1, 12), new THREE.Vector3(0.4, 0.925, -0.5), null, creamMat, 0.012));
+
+      // Tape measure
+      group.add(mp(new THREE.TorusGeometry(0.08, 0.025, 6, 20), new THREE.Vector3(0, 0.9, 0.9), new THREE.Euler(Math.PI/2, 0, 0), yellowMat, 0.010));
+
+      // Sketch paper
+      group.add(mp(new THREE.BoxGeometry(0.3, 0.005, 0.4), new THREE.Vector3(0.05, 0.9, -0.6), new THREE.Euler(0.03, 0.2, 0.02), creamMat, 0.008));
+
+      group.position.set(3.5, 0, 0);
+      group.rotation.y = Math.PI / 2;
+      return group;
+    }
+
+    // ================================================================
+    // FABRIC RACK + GARMENT RACK (inlined)
+    // ================================================================
+    function createFabricRack() {
+      const group = new THREE.Group();
+      group.name = 'fabric-rack-area';
+
+      const blackMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x101010) });
+      const silverMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x808080), specIntensity: 1.5, specShininess: 60 });
+      const woodMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x6b4a2c), shadowColor: new THREE.Color(0x2a1a0c) });
+
+      const fabricMats = [
+        createShaderMaterial('nylon', { baseColor: new THREE.Color(0xe8d8b8), shadowColor: new THREE.Color(0x6a5a40) }),
+        createShaderMaterial('denim'),
+        createShaderMaterial('nylon', { baseColor: new THREE.Color(0xb89868), shadowColor: new THREE.Color(0x4a3a20) }),
+        createShaderMaterial('nylon', { baseColor: new THREE.Color(0x4a5028), shadowColor: new THREE.Color(0x1a2008) }),
+        createShaderMaterial('nylon', { baseColor: new THREE.Color(0x2a2828), shadowColor: new THREE.Color(0x0a0808) }),
+        createShaderMaterial('nylon', { baseColor: new THREE.Color(0x8b4828), shadowColor: new THREE.Color(0x2a1408) }),
+      ];
+
+      function mp(geometry, position, rotation, mat, thickness = 0.014) {
+        return makePart(geometry, position, rotation, mat, thickness);
+      }
+
+      // --- A. FABRIC SHELF ---
+      const fabricShelf = new THREE.Group();
+      fabricShelf.name = 'fabric-shelf';
+
+      // 4 posts
+      const postGeo = new THREE.BoxGeometry(0.06, 2.4, 0.06);
+      [[0.6, 0.4], [0.6, -0.4], [-0.6, 0.4], [-0.6, -0.4]].forEach(([x,z]) => {
+        fabricShelf.add(mp(postGeo.clone(), new THREE.Vector3(x, 1.2, z), null, blackMat, 0.014));
+      });
+
+      // 3 shelves
+      const shelfGeo = new THREE.BoxGeometry(1.3, 0.04, 0.85);
+      [0.6, 1.4, 2.2].forEach(y => {
+        fabricShelf.add(mp(shelfGeo.clone(), new THREE.Vector3(0, y, 0), null, blackMat, 0.020));
+      });
+
+      // 6 fabric rolls
+      const rollSpecs = [
+        { y: 2.25, z: 0.22, r: 0.10, l: 0.85, mat: 0 },
+        { y: 2.25, z: -0.22, r: 0.08, l: 0.75, mat: 1 },
+        { y: 1.45, z: 0.22, r: 0.11, l: 0.90, mat: 2 },
+        { y: 1.45, z: -0.22, r: 0.09, l: 0.80, mat: 3 },
+        { y: 0.65, z: 0.22, r: 0.12, l: 0.85, mat: 4 },
+        { y: 0.65, z: -0.22, r: 0.10, l: 0.70, mat: 5 },
+      ];
+      rollSpecs.forEach(spec => {
+        const geo = new THREE.CylinderGeometry(spec.r, spec.r, spec.l, 14, 6);
+        applyPuffy(geo, 0.005, 8.0);
+        fabricShelf.add(mp(geo, new THREE.Vector3(0, spec.y, spec.z), new THREE.Euler(0, 0, Math.PI/2), fabricMats[spec.mat], 0.012));
+      });
+
+      // Draped fabric
+      const drapeGeo = new THREE.BoxGeometry(0.7, 0.5, 0.04);
+      applyPuffy(drapeGeo, 0.04, 6.0);
+      fabricShelf.add(mp(drapeGeo, new THREE.Vector3(0, 2.0, 0.45), new THREE.Euler(0.2, 0, 0), fabricMats[0], 0.014));
+
+      fabricShelf.position.set(-3, 0, -3.5);
+      fabricShelf.rotation.y = Math.PI * 0.15;
+      group.add(fabricShelf);
+
+      // --- B. GARMENT RACK ---
+      const garmentRack = new THREE.Group();
+      garmentRack.name = 'garment-rack';
+
+      // Rail
+      garmentRack.add(mp(new THREE.CylinderGeometry(0.025, 0.025, 1.6, 10), new THREE.Vector3(0, 1.7, 0), new THREE.Euler(0, 0, Math.PI/2), blackMat, 0.010));
+
+      // Posts
+      const rackPostGeo = new THREE.BoxGeometry(0.04, 1.7, 0.04);
+      garmentRack.add(mp(rackPostGeo.clone(), new THREE.Vector3(-0.8, 0.85, 0), null, blackMat, 0.010));
+      garmentRack.add(mp(rackPostGeo.clone(), new THREE.Vector3(0.8, 0.85, 0), null, blackMat, 0.010));
+
+      // Feet
+      const footGeo = new THREE.BoxGeometry(0.2, 0.05, 0.1);
+      garmentRack.add(mp(footGeo.clone(), new THREE.Vector3(-0.8, 0.025, 0), null, blackMat, 0.012));
+      garmentRack.add(mp(footGeo.clone(), new THREE.Vector3(0.8, 0.025, 0), null, blackMat, 0.012));
+
+      // Wheels
+      const wheelGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.02, 10);
+      [[-0.8, 0.07], [-0.8, -0.07], [0.8, 0.07], [0.8, -0.07]].forEach(([x,z]) => {
+        garmentRack.add(mp(wheelGeo.clone(), new THREE.Vector3(x, 0.04, z), new THREE.Euler(Math.PI/2, 0, 0), silverMat, 0.010));
+      });
+
+      // 6 hanging garments
+      const garmentPositions = [-0.675, -0.405, -0.135, 0.135, 0.405, 0.675];
+      garmentPositions.forEach((x, i) => {
+        const mat = fabricMats[i];
+
+        // Hanger — 2 angled shoulders + crossbar
+        const hangerShoulder = new THREE.BoxGeometry(0.12, 0.008, 0.02);
+        garmentRack.add(mp(hangerShoulder.clone(), new THREE.Vector3(x, 1.68, 0.02), new THREE.Euler(0, 0, 0.3), woodMat, 0.008));
+        garmentRack.add(mp(hangerShoulder.clone(), new THREE.Vector3(x, 1.68, 0.02), new THREE.Euler(0, 0, -0.3), woodMat, 0.008));
+        garmentRack.add(mp(new THREE.BoxGeometry(0.2, 0.008, 0.02), new THREE.Vector3(x, 1.66, 0), null, woodMat, 0.008));
+
+        // Garment body — tapered box
+        const bodyGeo = new THREE.BoxGeometry(0.4, 0.7, 0.05);
+        const bp = bodyGeo.attributes.position;
+        for (let j = 0; j < bp.count; j++) {
+          const yy = bp.getY(j);
+          if (yy > 0) {
+            bp.setX(j, bp.getX(j) * 0.75);
+            bp.setZ(j, bp.getZ(j) * 0.7);
+          }
+        }
+        bp.needsUpdate = true;
+        bodyGeo.computeVertexNormals();
+        applyPuffy(bodyGeo, 0.005, 8.0);
+        garmentRack.add(mp(bodyGeo, new THREE.Vector3(x, 1.32, 0), null, mat, 0.012));
+      });
+
+      // Cardboard box + scraps
+      const boxMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x8a7050), shadowColor: new THREE.Color(0x3a2810), specIntensity: 0.1 });
+      // 5 sides of open box
+      const boxW = 0.4, boxH = 0.3, boxD = 0.4, boxT = 0.02;
+      garmentRack.add(mp(new THREE.BoxGeometry(boxW, boxT, boxD), new THREE.Vector3(0.7, 0.01, 0.55), null, boxMat, 0.012));
+      garmentRack.add(mp(new THREE.BoxGeometry(boxW, boxH, boxT), new THREE.Vector3(0.7, boxH/2, 0.55 - boxD/2), null, boxMat, 0.012));
+      garmentRack.add(mp(new THREE.BoxGeometry(boxW, boxH, boxT), new THREE.Vector3(0.7, boxH/2, 0.55 + boxD/2), null, boxMat, 0.012));
+      garmentRack.add(mp(new THREE.BoxGeometry(boxT, boxH, boxD), new THREE.Vector3(0.7 - boxW/2, boxH/2, 0.55), null, boxMat, 0.012));
+      garmentRack.add(mp(new THREE.BoxGeometry(boxT, boxH, boxD), new THREE.Vector3(0.7 + boxW/2, boxH/2, 0.55), null, boxMat, 0.012));
+
+      // Scraps sticking out
+      garmentRack.add(mp(new THREE.CylinderGeometry(0.05, 0.05, 0.15, 8), new THREE.Vector3(0.65, 0.32, 0.50), new THREE.Euler(0.3, 0, 0.2), fabricMats[0], 0.010));
+      garmentRack.add(mp(new THREE.BoxGeometry(0.15, 0.005, 0.2), new THREE.Vector3(0.75, 0.33, 0.60), new THREE.Euler(0.2, 0.4, 0.1), fabricMats[5], 0.008));
+      garmentRack.add(mp(new THREE.CylinderGeometry(0.04, 0.05, 0.18, 8), new THREE.Vector3(0.70, 0.34, 0.55), new THREE.Euler(0.5, 0.2, -0.2), fabricMats[3], 0.010));
+
+      garmentRack.position.set(3, 0, -3.5);
+      garmentRack.rotation.y = -Math.PI * 0.15;
+      group.add(garmentRack);
+
+      return group;
+    }
+
+    // ================================================================
+    // ATELIER ROOM — floor, walls, ceiling, windows
+    // ================================================================
+    function createAtelierRoom() {
+      const group = new THREE.Group();
+      group.name = 'atelier-room';
+
+      const woodFloorMat = createShaderMaterial('wood');
+      const concreteMat = createShaderMaterial('concrete');
+      const plasterMat = createShaderMaterial('plaster');
+
+      function mp(geometry, position, rotation, mat, thickness = 0.012) {
+        return makePart(geometry, position, rotation, mat, thickness);
+      }
+
+      // Floor — wood planks (use multiple boxes for plank effect)
+      const plankGeo = new THREE.BoxGeometry(12, 0.05, 0.6);
+      for (let i = -7; i <= 7; i++) {
+        const mat = i % 2 === 0 ? woodFloorMat : createShaderMaterial('wood', { baseColor: new THREE.Color(0x5a3a20), shadowColor: new THREE.Color(0x2a1808) });
+        group.add(mp(plankGeo.clone(), new THREE.Vector3(0, -0.025, i * 0.62), null, mat, 0.008));
+      }
+
+      // Back wall — concrete
+      const backWallGeo = new THREE.BoxGeometry(12, 5, 0.2);
+      applyPuffy(backWallGeo, 0.04, 2.0);
+      group.add(mp(backWallGeo, new THREE.Vector3(0, 2.5, -5), null, concreteMat, 0.012));
+
+      // Side walls — plaster
+      const sideWallGeo = new THREE.BoxGeometry(0.2, 5, 10);
+      applyPuffy(sideWallGeo, 0.02, 2.5);
+      group.add(mp(sideWallGeo.clone(), new THREE.Vector3(-6, 2.5, 0), null, plasterMat, 0.012));
+      group.add(mp(sideWallGeo.clone(), new THREE.Vector3(6, 2.5, 0), null, plasterMat, 0.012));
+
+      // Front wall (behind camera) — partial, leave opening for camera view
+      // Actually we'll skip front wall for camera freedom
+
+      // Ceiling beam
+      const beamMat = woodFloorMat;
+      const beamGeo = new THREE.BoxGeometry(12, 0.3, 0.3);
+      group.add(mp(beamGeo, new THREE.Vector3(0, 4.85, 0), null, beamMat, 0.014));
+      group.add(mp(beamGeo.clone(), new THREE.Vector3(0, 4.85, -3), null, beamMat, 0.014));
+      group.add(mp(beamGeo.clone(), new THREE.Vector3(0, 4.85, 3), null, beamMat, 0.014));
+
+      // Pendant lights hanging from beams
+      const cordMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x101010) });
+      const lampMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0xd4c898), shadowColor: new THREE.Color(0x4a4030), specIntensity: 0.6 });
+
+      [[-2, 0], [2, 0], [0, -3], [0, 3], [-3, -3], [3, -3], [-3, 3], [3, 3]].forEach(([x,z]) => {
+        // Cord
+        group.add(mp(new THREE.CylinderGeometry(0.005, 0.005, 1.5, 6), new THREE.Vector3(x, 4.1, z), null, cordMat, 0.004));
+        // Lamp shade (cone)
+        const lampGeo = new THREE.ConeGeometry(0.15, 0.2, 16, 1, true);
+        group.add(mp(lampGeo, new THREE.Vector3(x, 3.3, z), null, lampMat, 0.012));
+        // Bulb (small sphere)
+        const bulbMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0xfff0c0), shadowColor: new THREE.Color(0x6a5a30), specIntensity: 3.0, specShininess: 80 });
+        group.add(mp(new THREE.SphereGeometry(0.04, 10, 8), new THREE.Vector3(x, 3.32, z), null, bulbMat, 0.006));
+      });
+
+      // Window on left wall — letting in atmospheric light
+      const windowFrameMat = woodFloorMat;
+      const glassMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0xa8c0d8), shadowColor: new THREE.Color(0x404858), specIntensity: 0.8, specShininess: 50 });
+
+      // Window frame on left wall (-6, 2.5, 0)
+      const winFrameH = new THREE.BoxGeometry(0.06, 2.5, 0.1);
+      const winFrameV = new THREE.BoxGeometry(0.06, 0.1, 2.0);
+      group.add(mp(winFrameH.clone(), new THREE.Vector3(-5.95, 2.5, -1), null, windowFrameMat, 0.012));
+      group.add(mp(winFrameH.clone(), new THREE.Vector3(-5.95, 2.5, 1), null, windowFrameMat, 0.012));
+      group.add(mp(winFrameV.clone(), new THREE.Vector3(-5.95, 3.75, 0), null, windowFrameMat, 0.012));
+      group.add(mp(winFrameV.clone(), new THREE.Vector3(-5.95, 1.25, 0), null, windowFrameMat, 0.012));
+      group.add(mp(winFrameV.clone(), new THREE.Vector3(-5.95, 2.5, 0), new THREE.Euler(0, 0, Math.PI/2), windowFrameMat, 0.012));
+
+      // Glass pane
+      const glassGeo = new THREE.BoxGeometry(0.02, 2.4, 1.9);
+      group.add(mp(glassGeo, new THREE.Vector3(-5.95, 2.5, 0), null, glassMat, 0.008));
+
+      // Mirror on right wall
+      const mirrorFrameMat = woodFloorMat;
+      const mirrorMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0x6080a0), shadowColor: new THREE.Color(0x202830), specIntensity: 1.8, specShininess: 80 });
+      const mFrameH = new THREE.BoxGeometry(0.08, 0.1, 1.6);
+      const mFrameV = new THREE.BoxGeometry(0.08, 2.4, 0.1);
+      group.add(mp(mFrameH.clone(), new THREE.Vector3(5.95, 2.5, -0.8), null, mirrorFrameMat, 0.012));
+      group.add(mp(mFrameH.clone(), new THREE.Vector3(5.95, 2.5, 0.8), null, mirrorFrameMat, 0.012));
+      group.add(mp(mFrameV.clone(), new THREE.Vector3(5.95, 3.7, 0), null, mirrorFrameMat, 0.012));
+      group.add(mp(mFrameV.clone(), new THREE.Vector3(5.95, 1.3, 0), null, mirrorFrameMat, 0.012));
+      group.add(mp(new THREE.BoxGeometry(0.02, 2.3, 1.5), new THREE.Vector3(5.95, 2.5, 0), null, mirrorMat, 0.008));
+
+      // Studio stool near mannequin
+      const stoolMat = woodFloorMat;
+      group.add(mp(new THREE.CylinderGeometry(0.18, 0.18, 0.04, 16), new THREE.Vector3(1.4, 0.55, 1.4), null, stoolMat, 0.012));
+      group.add(mp(new THREE.CylinderGeometry(0.04, 0.04, 0.55, 8), new THREE.Vector3(1.4, 0.275, 1.4), null, stoolMat, 0.010));
+      group.add(mp(new THREE.CylinderGeometry(0.18, 0.20, 0.02, 16), new THREE.Vector3(1.4, 0.02, 1.4), null, stoolMat, 0.010));
+
+      // Dress form (smaller mannequin bust) near cutting table area
+      const dressFormMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(0xa89878), shadowColor: new THREE.Color(0x403828), specIntensity: 0.2 });
+      const dfGroup = new THREE.Group();
+      // Bust
+      const bustGeo = new THREE.CylinderGeometry(0.18, 0.24, 0.7, 14, 8);
+      applyPuffy(bustGeo, 0.015, 3.5);
+      dfGroup.add(makePart(bustGeo, new THREE.Vector3(0, 1.05, 0), null, dressFormMat, 0.018));
+      // Neck
+      dfGroup.add(makePart(new THREE.CylinderGeometry(0.05, 0.06, 0.12, 8), new THREE.Vector3(0, 1.45, 0), null, dressFormMat, 0.014));
+      // Pole
+      dfGroup.add(makePart(new THREE.CylinderGeometry(0.02, 0.02, 0.85, 8), new THREE.Vector3(0, 0.55, 0), null, silverMat, 0.008));
+      // Base
+      dfGroup.add(makePart(new THREE.CylinderGeometry(0.20, 0.22, 0.04, 16), new THREE.Vector3(0, 0.13, 0), null, stoolMat, 0.012));
+      dfGroup.position.set(-1.5, 0, 2.5);
+      group.add(dfGroup);
+
+      // Spool rack — wall-mounted spools
+      const spoolRackGroup = new THREE.Group();
+      const spoolRackBar = new THREE.BoxGeometry(0.04, 1.5, 0.04);
+      spoolRackGroup.add(makePart(spoolRackBar, new THREE.Vector3(0, 0, 0), null, woodMat, 0.010));
+      const spoolColors = [0x8b2820, 0x2a3a55, 0xb89868, 0x4a5028, 0xe8d8b8, 0x8b4828, 0x2a2828, 0xc8b040];
+      for (let i = 0; i < 8; i++) {
+        const y = -0.6 + i * 0.18;
+        const spoolMat = createShaderMaterial('nylon', { baseColor: new THREE.Color(spoolColors[i]), shadowColor: new THREE.Color(0x202020) });
+        spoolRackGroup.add(makePart(new THREE.CylinderGeometry(0.04, 0.04, 0.08, 10), new THREE.Vector3(0.08, y, 0), new THREE.Euler(0, 0, Math.PI/2), spoolMat, 0.010));
+        spoolRackGroup.add(makePart(new THREE.CylinderGeometry(0.005, 0.005, 0.12, 4), new THREE.Vector3(0.04, y, 0), new THREE.Euler(0, 0, Math.PI/2), silverMat, 0.006));
+      }
+      spoolRackGroup.position.set(-5.85, 2.5, -2.5);
+      spoolRackGroup.rotation.y = Math.PI / 2;
+      group.add(spoolRackGroup);
+
+      return group;
+    }
+
+    // ================================================================
+    // SCENE SETUP
+    // ================================================================
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x1a1614);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x1a1614, 12, 25);
+
+    const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(5.5, 3.5, 6.5);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.target.set(0, 2.3, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 4;
+    controls.maxDistance = 14;
+    controls.minPolarAngle = Math.PI * 0.12;
+    controls.maxPolarAngle = Math.PI * 0.55;
+    controls.enablePan = true;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.4;
+
+    // --- Lighting: warm key + cool fill + rim + spotlights ---
+    const keyLight = new THREE.DirectionalLight(0xfff0d8, 1.3);
+    keyLight.position.set(4, 7, 3);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xb0c4d8, 0.3);
+    fillLight.position.set(-4, 3, -2);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffd9a0, 0.6);
+    rimLight.position.set(0, 4, -6);
+    scene.add(rimLight);
+
+    scene.add(new THREE.AmbientLight(0x2a2620, 0.4));
+
+    // Atmospheric spotlights on mannequin
+    const mannequinSpot = new THREE.SpotLight(0xfff0d0, 1.0, 8, Math.PI * 0.18, 0.4, 1.2);
+    mannequinSpot.position.set(0, 5, 2);
+    mannequinSpot.target.position.set(0, 2.5, 0);
+    scene.add(mannequinSpot);
+    scene.add(mannequinSpot.target);
+
+    // Window light shaft (cool, from left)
+    const windowLight = new THREE.SpotLight(0xc8d8f0, 0.6, 12, Math.PI * 0.35, 0.6, 1.5);
+    windowLight.position.set(-5, 3, 0);
+    windowLight.target.position.set(0, 0, 0);
+    scene.add(windowLight);
+    scene.add(windowLight.target);
+
+    // --- Atmospheric dust particles ---
+    const dustGeo = new THREE.BufferGeometry();
+    const dustCount = 300;
+    const dustPositions = new Float32Array(dustCount * 3);
+    const dustSpeeds = new Float32Array(dustCount);
+    for (let i = 0; i < dustCount; i++) {
+      dustPositions[i*3] = (Math.random() - 0.5) * 12;
+      dustPositions[i*3+1] = Math.random() * 5;
+      dustPositions[i*3+2] = (Math.random() - 0.5) * 10;
+      dustSpeeds[i] = 0.1 + Math.random() * 0.3;
+    }
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+    const dustMat = new THREE.PointsMaterial({
+      color: 0xfff0d8,
+      size: 0.025,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const dust = new THREE.Points(dustGeo, dustMat);
+    scene.add(dust);
+
+    // --- Build the scene ---
+    const loaderFill = document.getElementById('loader-fill');
+    let progress = 0;
+    const updateProgress = (inc) => {
+      progress += inc;
+      loaderFill.style.width = Math.min(100, progress) + '%';
+    };
+    updateProgress(5);
+
+    const room = createAtelierRoom();
+    scene.add(room);
+    updateProgress(15);
+
+    const sewingStation = createSewingStation();
+    scene.add(sewingStation);
+    updateProgress(15);
+
+    const cuttingTable = createCuttingTable();
+    scene.add(cuttingTable);
+    updateProgress(15);
+
+    const fabricRack = createFabricRack();
+    scene.add(fabricRack);
+    updateProgress(15);
+
+    const mannequin = createMannequin();
+    scene.add(mannequin);
+    updateProgress(15);
+
+    const garments = {
+      bulk: createBulkShirt(),
+      fur: createFurCoat(),
+      scarf: createScarfVest(),
+    };
+    Object.values(garments).forEach(g => {
+      g.visible = false;
+      scene.add(g);
+    });
+    updateProgress(20);
+
+    // --- UI ---
+    const DESC = {
+      bulk: {
+        code: 'Look 03 — Washed Denim',
+        name: 'BULK SHIRT',
+        desc: 'Boxy oversized silhouette. Hand-bleached washed denim. Drop shoulders, extended hem. Front welt pockets replace traditional chest pockets.',
+      },
+      fur: {
+        code: 'Look 09 — Eco-Fur',
+        name: 'BIGFOOT FUR COAT',
+        desc: 'Massive eco-fur volume. Bigfoot silhouette. The showpiece — protective, sculptural, unapologetic. Rendered via Fur Shells: 14 concentric layers with procedural strand noise.',
+      },
+      scarf: {
+        code: 'Look 04 — Nylon Padded',
+        name: 'SCARF-VEST',
+        desc: 'Padded nylon vest with integrated scarf wrapping diagonally around neck. Protective geometry. Technical material, sartorial logic.',
+      },
+    };
+
+    function showGarment(key) {
+      Object.entries(garments).forEach(([k, g]) => g.visible = (k === key));
+      const d = DESC[key];
+      document.getElementById('garment-code').textContent = d.code;
+      document.getElementById('garment-name').textContent = d.name;
+      document.getElementById('garment-desc').textContent = d.desc;
+      document.querySelectorAll('.garment-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.garment === key);
+      });
+    }
+
+    document.querySelectorAll('.garment-btn').forEach(btn => {
+      btn.addEventListener('click', () => showGarment(btn.dataset.garment));
+    });
+
+    showGarment('bulk');
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'h') {
+        const ui = document.getElementById('ui');
+        const info = document.getElementById('info');
+        const stats = document.getElementById('stats');
+        const hidden = ui.style.display === 'none';
+        ui.style.display = hidden ? '' : 'none';
+        info.style.display = hidden ? '' : 'none';
+        stats.style.display = hidden ? '' : 'none';
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- Render loop ---
+    const fpsEl = document.getElementById('fps');
+    let lastFps = performance.now();
+    let frames = 0;
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+
+      // Drift dust particles
+      const positions = dust.geometry.attributes.position.array;
+      for (let i = 0; i < dustCount; i++) {
+        positions[i*3+1] += dustSpeeds[i] * 0.005;
+        positions[i*3] += Math.sin(t * 0.3 + i) * 0.001;
+        if (positions[i*3+1] > 5) positions[i*3+1] = 0;
+      }
+      dust.geometry.attributes.position.needsUpdate = true;
+
+      controls.update();
+      renderer.render(scene, camera);
+
+      frames++;
+      const now = performance.now();
+      if (now - lastFps > 500) {
+        fpsEl.textContent = Math.round((frames * 1000) / (now - lastFps)) + ' fps';
+        frames = 0;
+        lastFps = now;
+      }
+    }
+
+    setTimeout(() => {
+      document.getElementById('loader').classList.add('hidden');
+      document.body.classList.add('loaded');
+      animate();
+    }, 500);
+  </script>
+</body>
+</html>
