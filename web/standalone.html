@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TMMT — Atelier Sferico (Standalone)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #0c0a08; color: #d4d0c8;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+    canvas { display: block; }
+
+    #loader {
+      position: fixed; inset: 0;
+      background: #0c0a08;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 100;
+      transition: opacity 0.6s ease;
+    }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+    #loader .title {
+      font-size: 10px; letter-spacing: 0.4em; color: #888;
+      text-transform: uppercase; margin-bottom: 18px; font-weight: 600;
+    }
+    #loader .bar {
+      width: 220px; height: 1px; background: #333;
+      position: relative; overflow: hidden;
+    }
+    #loader .bar-fill {
+      position: absolute; top: 0; left: 0; height: 100%;
+      width: 0%; background: #d4d0c8;
+      transition: width 0.3s ease;
+    }
+    #loader .status {
+      font-size: 9px; color: #555; letter-spacing: 0.15em;
+      margin-top: 14px; text-transform: uppercase; font-weight: 600;
+    }
+
+    #ui {
+      position: fixed;
+      top: 32px; left: 32px;
+      z-index: 10;
+      max-width: 320px;
+      pointer-events: none;
+    }
+    #ui > * { pointer-events: auto; }
+
+    .brand {
+      font-size: 9px;
+      letter-spacing: 0.4em;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .title {
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      color: #d4d0c8;
+      margin-bottom: 28px;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    .look-list { display: flex; flex-direction: column; gap: 4px; }
+    .look-btn {
+      background: transparent;
+      border: 1px solid #2a2622;
+      color: #888;
+      padding: 12px 16px;
+      font-family: inherit;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.18s ease;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-weight: 600;
+    }
+    .look-btn:hover { border-color: #d4d0c8; color: #d4d0c8; background: rgba(255,255,255,0.03); }
+    .look-btn.active { border-color: #d4d0c8; color: #d4d0c8; background: rgba(255,255,255,0.06); }
+    .look-btn .num { font-size: 9px; color: #555; min-width: 20px; }
+    .look-btn.active .num { color: #888; }
+    .look-btn .material-tag {
+      margin-left: auto;
+      font-size: 8px;
+      color: #555;
+      letter-spacing: 0.2em;
+    }
+    .look-btn.active .material-tag { color: #888; }
+
+    #info {
+      position: fixed;
+      bottom: 32px; left: 32px;
+      font-size: 9px;
+      color: #555;
+      letter-spacing: 0.15em;
+      line-height: 1.8;
+      text-transform: uppercase;
+      font-weight: 600;
+      max-width: 380px;
+    }
+    #info b { color: #d4d0c8; font-weight: 700; }
+
+    #stats {
+      position: fixed;
+      bottom: 32px; right: 32px;
+      font-size: 9px;
+      color: #555;
+      text-align: right;
+      letter-spacing: 0.2em;
+      font-weight: 600;
+      line-height: 1.8;
+    }
+
+    #vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.45) 100%);
+      z-index: 5;
+    }
+
+    body { opacity: 0; transition: opacity 0.6s ease; }
+    body.loaded { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="loader">
+    <div class="title">TMMT — ATELIER SFERICO</div>
+    <div class="bar"><div class="bar-fill" id="loader-fill"></div></div>
+    <div class="status" id="loader-status">BOOTING</div>
+  </div>
+
+  <div id="ui">
+    <div class="brand">TMMT — Atelier Sferico</div>
+    <div class="title">Lookbook 3D — Standalone</div>
+    <div class="look-list" id="look-list"></div>
+  </div>
+
+  <div id="info">
+    <b>1–5</b> switch look · <b>H</b> hide UI · <b>R</b> auto-rotate · <b>Drag</b> orbit · <b>Scroll</b> zoom
+  </div>
+
+  <div id="stats">
+    <div id="fps">— fps</div>
+    <div id="look-name" style="margin-top:4px;">—</div>
+  </div>
+
+  <div id="vignette"></div>
+  <canvas id="c"></canvas>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+    import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+    // ================================================================
+    // AtelierLoader (inlined for standalone build)
+    // Same as web/AtelierLoader.js — production loader for GLB assets
+    // ================================================================
+
+    // --- Shaders (Messenger-style cel-shading + Inverted Hull outline) ---
+    const VERT_SHADER = `
+      varying vec3 vNormal;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        vNormal = normalize(normalMatrix * normal);
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPos = worldPos.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `;
+
+    const OUTLINE_VERT_SHADER = `
+      uniform float uOutlineThickness;
+      void main() {
+        vec3 displaced = position + normal * uOutlineThickness;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+      }
+    `;
+
+    const FUR_VERT_SHADER = `
+      uniform float uShellOffset;
+      varying vec3 vNormal;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        vec3 displaced = position + normal * uShellOffset;
+        vNormal = normalize(normalMatrix * normal);
+        vec4 worldPos = modelMatrix * vec4(displaced, 1.0);
+        vWorldPos = worldPos.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `;
+
+    const FRAG_SHADER = `
+      precision highp float;
+      varying vec3 vNormal;
+      varying vec3 vWorldPos;
+      varying vec2 vUv;
+
+      uniform vec3  uBaseColor;
+      uniform vec3  uShadowColor;
+      uniform vec3  uLightDir;
+      uniform float uBands;
+      uniform float uSoftness;
+      uniform float uSpecIntensity;
+      uniform float uSpecShininess;
+      uniform float uSpecThreshold;
+      uniform int   uMaterialType;       // 0 nylon, 1 denim, 2 laser, 3 fur
+      uniform float uShellIndex;
+      uniform float uShellCount;
+
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+      }
+      float noise(vec2 p) {
+        vec2 i = floor(p); vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x),
+                   mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+      }
+      float fbm(vec2 p) {
+        float v = 0.0; float a = 0.5;
+        for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.0; a *= 0.5; }
+        return v;
+      }
+
+      void main() {
+        vec3 N = normalize(vNormal);
+        vec3 L = normalize(uLightDir);
+        float NdotL = dot(N, L);
+        float shade = NdotL * 0.5 + 0.5;
+        float band = floor(shade * uBands) / uBands;
+        band = clamp(band, 0.0, 1.0);
+        vec3 color = mix(uShadowColor, uBaseColor, band);
+        float alpha = 1.0;
+        vec3 V = normalize(cameraPosition - vWorldPos);
+
+        if (uMaterialType == 0) {
+          vec3 H = normalize(L + V);
+          float spec = pow(max(dot(N, H), 0.0), uSpecShininess);
+          spec = step(uSpecThreshold, spec);
+          color += vec3(spec) * uSpecIntensity;
+        } else if (uMaterialType == 1) {
+          float weave = sin(vUv.y * 220.0) * 0.5 + 0.5;
+          weave = mix(0.93, 1.0, weave);
+          float fabNoise = fbm(vUv * 6.0);
+          float bleach = fbm(vUv * 2.5);
+          bleach = smoothstep(0.4, 0.65, bleach);
+          vec3 bleached = mix(uBaseColor, uBaseColor * 1.8 + vec3(0.08, 0.09, 0.1), 0.7);
+          vec3 base = mix(uBaseColor, bleached, bleach) * weave * mix(0.85, 1.15, fabNoise);
+          color = mix(uShadowColor, base, band);
+          vec3 H = normalize(L + V);
+          float spec = pow(max(dot(N, H), 0.0), uSpecShininess);
+          color += vec3(spec) * uSpecIntensity * 0.3;
+        } else if (uMaterialType == 2) {
+          float engrave = fbm(vUv * 35.0);
+          float mask = smoothstep(0.48, 0.52, engrave);
+          vec3 fakeN = N;
+          float p = (engrave - 0.5) * 0.7;
+          fakeN.xy += vec2(p, -p * 0.7);
+          fakeN = normalize(fakeN);
+          float eShade = dot(fakeN, L) * 0.5 + 0.5;
+          float eBand = floor(eShade * uBands) / uBands;
+          vec3 lightC = mix(uShadowColor, uBaseColor, band);
+          vec3 darkC = mix(uShadowColor * 0.4, uBaseColor * 0.4, eBand);
+          color = mix(lightC, darkC, mask);
+        } else if (uMaterialType == 3) {
+          float strandN = fbm(vUv * 60.0 + uShellIndex * 0.5);
+          float strands = smoothstep(0.3, 0.65, strandN);
+          float shellProg = uShellIndex / uShellCount;
+          float shellFade = 1.0 - shellProg * 0.85;
+          alpha = strands * shellFade;
+          vec3 innerC = uBaseColor * 0.65;
+          vec3 outerC = uBaseColor * 1.25;
+          vec3 furC = mix(innerC, outerC, shellProg);
+          furC *= mix(0.8, 1.2, strandN);
+          color = mix(uShadowColor * 0.7, furC, band);
+        }
+
+        color = pow(color, vec3(1.0 / 2.2));
+        gl_FragColor = vec4(color, alpha);
+      }
+    `;
+
+    const OUTLINE_FRAG_SHADER = `
+      precision highp float;
+      uniform vec3 uOutlineColor;
+      void main() {
+        gl_FragColor = vec4(uOutlineColor, 1.0);
+      }
+    `;
+
+    const MATERIAL_PRESETS = {
+      denim: {
+        baseColor: new THREE.Color(0x3a5070),
+        shadowColor: new THREE.Color(0x1a2535),
+        bands: 3.0, softness: 0.55,
+        specIntensity: 0.3, specShininess: 12.0, specThreshold: 0.85,
+        type: 1, isFur: false,
+      },
+      nylon: {
+        baseColor: new THREE.Color(0x2a2a2a),
+        shadowColor: new THREE.Color(0x0a0a0a),
+        bands: 3.0, softness: 0.22,
+        specIntensity: 1.8, specShininess: 80.0, specThreshold: 0.55,
+        type: 0, isFur: false,
+      },
+      nylonLight: {
+        baseColor: new THREE.Color(0x383838),
+        shadowColor: new THREE.Color(0x141414),
+        bands: 3.0, softness: 0.22,
+        specIntensity: 1.6, specShininess: 70.0, specThreshold: 0.55,
+        type: 0, isFur: false,
+      },
+      laser: {
+        baseColor: new THREE.Color(0x141414),
+        shadowColor: new THREE.Color(0x050505),
+        bands: 3.0, softness: 0.2,
+        specIntensity: 0.5, specShininess: 24.0, specThreshold: 0.7,
+        type: 2, isFur: false,
+      },
+      fur: {
+        baseColor: new THREE.Color(0xc8b896),
+        shadowColor: new THREE.Color(0x4a4030),
+        bands: 3.0, softness: 0.4,
+        specIntensity: 0.1, specShininess: 8.0, specThreshold: 0.9,
+        type: 3, isFur: true,
+        shellCount: 14, shellSpacing: 0.014,
+      },
+    };
+
+    const SKIP_PREFIXES = ['mesh_skin_', 'mesh_other_'];
+
+    class AtelierLoader {
+      constructor({ renderer, scene, lightDir, presets }) {
+        if (!renderer) throw new Error('AtelierLoader: renderer is required');
+        if (!scene)    throw new Error('AtelierLoader: scene is required');
+        if (!lightDir) throw new Error('AtelierLoader: lightDir is required');
+        this.renderer = renderer;
+        this.scene = scene;
+        this.lightDir = lightDir.clone().normalize();
+        this.presets = presets || MATERIAL_PRESETS;
+        this._currentLookRoot = null;
+        this._initLoaders();
+      }
+
+      _initLoaders() {
+        this.gltfLoader = new GLTFLoader();
+        this.ktx2Loader = new KTX2Loader()
+          .setTranscoderPath('https://unpkg.com/three@0.160.0/examples/jsm/libs/basis/')
+          .detectSupport(this.renderer);
+        this.gltfLoader.setKTX2Loader(this.ktx2Loader);
+        this.gltfLoader.setMeshoptDecoder(MeshoptDecoder);
+      }
+
+      async loadLook({ glbPath, position, scale = 1.0, onLoad, onProgress }) {
+        if (!glbPath) throw new Error('AtelierLoader.loadLook: glbPath is required');
+        this.disposeCurrentLook();
+
+        const gltf = await new Promise((resolve, reject) => {
+          this.gltfLoader.load(glbPath, resolve, (ev) => onProgress?.(ev.loaded / ev.total), reject);
+        });
+
+        const root = gltf.scene;
+        root.scale.setScalar(scale);
+        if (position) root.position.copy(position);
+
+        this._parseScene(root);
+
+        this.scene.add(root);
+        this._currentLookRoot = root;
+        this._currentGltf = gltf;
+        onLoad?.();
+        return root;
+      }
+
+      _parseScene(root) {
+        root.traverse((obj) => {
+          if (!obj.isMesh) return;
+          const name = obj.name || '';
+          if (SKIP_PREFIXES.some(p => name.startsWith(p))) return;
+          const matKey = this._matchMaterialKey(name);
+          if (!matKey) {
+            console.warn(`[AtelierLoader] Mesh "${name}" did not match any preset prefix. Keeping original PBR material.`);
+            return;
+          }
+          const preset = this.presets[matKey];
+          if (!preset) {
+            console.warn(`[AtelierLoader] No preset found for key "${matKey}". Skipping mesh "${name}".`);
+            return;
+          }
+          obj.updateMatrixWorld(true);
+          if (preset.isFur) {
+            this._buildFurShells(obj, preset);
+          } else {
+            this._swapToShaderMaterial(obj, preset);
+          }
+        });
+      }
+
+      _matchMaterialKey(meshName) {
+        const m = meshName.match(/^mesh_([a-zA-Z0-9]+)_/);
+        if (!m) return null;
+        const key = m[1];
+        return this.presets[key] ? key : null;
+      }
+
+      _swapToShaderMaterial(mesh, preset) {
+        const original = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        original.forEach(m => m?.dispose?.());
+        mesh.material = this._createShaderMaterial(preset);
+        if (mesh.geometry && !mesh.geometry.attributes.normal) {
+          mesh.geometry.computeVertexNormals();
+        }
+        // Add outline sibling
+        const outline = this._createOutline(mesh.geometry);
+        mesh.parent.add(outline);
+        // Track for disposal
+        this._outlines = this._outlines || [];
+        this._outlines.push(outline);
+      }
+
+      _createShaderMaterial(preset) {
+        return new THREE.ShaderMaterial({
+          vertexShader: VERT_SHADER,
+          fragmentShader: FRAG_SHADER,
+          uniforms: {
+            uBaseColor:     { value: preset.baseColor.clone() },
+            uShadowColor:   { value: preset.shadowColor.clone() },
+            uLightDir:      { value: this.lightDir.clone() },
+            uBands:         { value: preset.bands },
+            uSoftness:      { value: preset.softness },
+            uSpecIntensity: { value: preset.specIntensity },
+            uSpecShininess: { value: preset.specShininess },
+            uSpecThreshold: { value: preset.specThreshold },
+            uTime:          { value: 0 },
+            uMaterialType:  { value: preset.type },
+            uShellIndex:    { value: 0 },
+            uShellCount:    { value: 1 },
+          },
+        });
+      }
+
+      _createOutline(geometry, thickness = 0.022, color = 0x000000) {
+        const outlineMat = new THREE.ShaderMaterial({
+          vertexShader: OUTLINE_VERT_SHADER,
+          fragmentShader: OUTLINE_FRAG_SHADER,
+          uniforms: {
+            uOutlineThickness: { value: thickness },
+            uOutlineColor: { value: new THREE.Color(color) },
+          },
+          side: THREE.BackSide,
+          depthWrite: true,
+        });
+        const outline = new THREE.Mesh(geometry, outlineMat);
+        outline.renderOrder = -1;
+        return outline;
+      }
+
+      _buildFurShells(mesh, preset) {
+        const shellCount = preset.shellCount || 14;
+        const spacing = preset.shellSpacing || 0.014;
+        const original = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        original.forEach(m => m?.dispose?.());
+        mesh.material = this._createFurShellMaterial(preset, 0, shellCount, 0);
+        mesh.renderOrder = 0;
+        const parent = mesh.parent;
+        this._furShells = this._furShells || [];
+        for (let i = 1; i < shellCount; i++) {
+          const shell = new THREE.Mesh(mesh.geometry, null);
+          shell.name = `${mesh.name}_shell_${i}`;
+          shell.position.copy(mesh.position);
+          shell.rotation.copy(mesh.rotation);
+          shell.scale.copy(mesh.scale);
+          shell.matrix.copy(mesh.matrix);
+          shell.matrixAutoUpdate = false;
+          shell.material = this._createFurShellMaterial(preset, i, shellCount, i * spacing);
+          shell.renderOrder = i;
+          shell.material.transparent = true;
+          shell.material.depthWrite = false;
+          parent.add(shell);
+          this._furShells.push(shell);
+        }
+      }
+
+      _createFurShellMaterial(preset, shellIndex, shellCount, shellOffset) {
+        return new THREE.ShaderMaterial({
+          vertexShader: FUR_VERT_SHADER,
+          fragmentShader: FRAG_SHADER,
+          uniforms: {
+            uBaseColor:     { value: preset.baseColor.clone() },
+            uShadowColor:   { value: preset.shadowColor.clone() },
+            uLightDir:      { value: this.lightDir.clone() },
+            uBands:         { value: preset.bands },
+            uSoftness:      { value: preset.softness },
+            uSpecIntensity: { value: preset.specIntensity },
+            uSpecShininess: { value: preset.specShininess },
+            uSpecThreshold: { value: preset.specThreshold },
+            uTime:          { value: 0 },
+            uMaterialType:  { value: 3 },
+            uShellIndex:    { value: shellIndex },
+            uShellCount:    { value: shellCount },
+            uShellOffset:   { value: shellOffset },
+          },
+        });
+      }
+
+      setLightDir(dir) {
+        this.lightDir.copy(dir).normalize();
+        if (!this._currentLookRoot) return;
+        this._currentLookRoot.traverse((obj) => {
+          if (!obj.isMesh) return;
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.forEach(m => {
+            if (m?.uniforms?.uLightDir) m.uniforms.uLightDir.value.copy(this.lightDir);
+          });
+        });
+      }
+
+      update(time) {
+        if (!this._currentLookRoot) return;
+        this._currentLookRoot.traverse((obj) => {
+          if (!obj.isMesh) return;
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.forEach(m => {
+            if (m?.uniforms?.uTime) m.uniforms.uTime.value = time;
+          });
+        });
+      }
+
+      disposeCurrentLook() {
+        if (this._furShells) {
+          this._furShells.forEach(s => {
+            s.parent?.remove(s);
+            s.material?.dispose();
+          });
+          this._furShells = null;
+        }
+        if (this._outlines) {
+          this._outlines.forEach(o => {
+            o.parent?.remove(o);
+            o.material?.dispose();
+          });
+          this._outlines = null;
+        }
+        if (this._currentLookRoot) {
+          this._currentLookRoot.traverse((obj) => {
+            if (!obj.isMesh) return;
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            mats.forEach(m => m?.dispose?.());
+            obj.geometry?.dispose?.();
+          });
+          this.scene.remove(this._currentLookRoot);
+          this._currentLookRoot = null;
+        }
+      }
+
+      dispose() {
+        this.disposeCurrentLook();
+        this.ktx2Loader?.dispose?.();
+        this.gltfLoader = null;
+      }
+    }
+
+    // ================================================================
+    // SCENE
+    // ================================================================
+
+    function showFatalError(msg) {
+      const el = document.createElement('div');
+      el.style.cssText = 'position:fixed;inset:0;background:#1a0000;color:#ff8080;font-family:monospace;font-size:13px;padding:40px;z-index:9999;white-space:pre-wrap;overflow:auto;';
+      el.textContent = 'RUNTIME ERROR:\n\n' + (msg.stack || msg);
+      document.body.appendChild(el);
+      document.getElementById('loader').classList.add('hidden');
+      document.body.classList.add('loaded');
+    }
+
+    try {
+
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x0c0a08);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x0c0a08, 8, 22);
+
+    const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(3.5, 2.8, 5.2);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.target.set(0, 1.2, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 3;
+    controls.maxDistance = 12;
+    controls.minPolarAngle = Math.PI * 0.15;
+    controls.maxPolarAngle = Math.PI * 0.6;
+    controls.enablePan = false;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.6;
+
+    // Lighting
+    const keyLight = new THREE.DirectionalLight(0xfff0d8, 1.4);
+    keyLight.position.set(4, 6, 3);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xb0c4d8, 0.25);
+    fillLight.position.set(-4, 2.5, -2);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffd9a0, 0.5);
+    rimLight.position.set(0, 4, -5);
+    scene.add(rimLight);
+
+    scene.add(new THREE.AmbientLight(0x2a2620, 0.4));
+
+    // Floor + pedestal
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(6, 64),
+      new THREE.MeshBasicMaterial({ color: 0x141210 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    const pedestal = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.4, 1.5, 0.08, 48),
+      new THREE.MeshBasicMaterial({ color: 0x1c1a18 })
+    );
+    pedestal.position.y = 0.04;
+    scene.add(pedestal);
+
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(1.4, 1.43, 96),
+      new THREE.MeshBasicMaterial({ color: 0x4a4640, side: THREE.DoubleSide })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.085;
+    scene.add(ring);
+
+    // AtelierLoader
+    const loader = new AtelierLoader({
+      renderer,
+      scene,
+      lightDir: keyLight.position.clone().normalize(),
+    });
+
+    // ---- LOOK REGISTRY ----
+    // Standalone build: meshes are generated in-JS (no fetch needed) so this works
+    // via file:// double-click. Each "look" creates a placeholder mesh + loads it
+    // through the AtelierLoader's material swap pipeline (simulating real GLB load).
+    const LOOKS = [
+      { id: 1, label: 'Nylon Test',   material: 'nylon',  geo: () => new THREE.BoxGeometry(0.6, 1.4, 0.3) },
+      { id: 2, label: 'Denim Test',   material: 'denim',  geo: () => new THREE.BoxGeometry(0.7, 1.5, 0.35) },
+      { id: 3, label: 'Fur Test',     material: 'fur',    geo: () => new THREE.IcosahedronGeometry(0.7, 2) },
+      { id: 4, label: 'Laser Test',   material: 'laser',  geo: () => new THREE.BoxGeometry(0.5, 1.2, 0.25) },
+      { id: 5, label: 'Skin Dummy',   material: 'skin',   geo: () => new THREE.CylinderGeometry(0.2, 0.2, 1.8, 12) },
+    ];
+
+    // In standalone mode we bypass the GLB load and create meshes directly,
+    // then run them through the AtelierLoader's material swap logic.
+    function loadLookInMemory(look, position, scale = 1.0) {
+      loader.disposeCurrentLook();
+      const root = new THREE.Group();
+      root.scale.setScalar(scale);
+      root.position.copy(position);
+
+      const geo = look.geo();
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial());
+      mesh.name = `mesh_${look.material}_placeholder`;
+      mesh.position.y = 1.0;  // sit on pedestal
+      root.add(mesh);
+
+      // Add a "skin mannequin" base for context
+      const mannequinGeo = new THREE.CylinderGeometry(0.18, 0.22, 1.0, 12);
+      const mannequinMesh = new THREE.Mesh(mannequinGeo, new THREE.MeshStandardMaterial({ color: 0x404040 }));
+      mannequinMesh.name = 'mesh_skin_base';
+      mannequinMesh.position.y = 0.5;
+      root.add(mannequinMesh);
+
+      scene.add(root);
+      loader._currentLookRoot = root;
+      loader._parseScene(root);
+    }
+
+    const lookListEl = document.getElementById('look-list');
+    const loaderFill = document.getElementById('loader-fill');
+    const loaderStatus = document.getElementById('loader-status');
+    const lookNameEl = document.getElementById('look-name');
+    let currentLookId = null;
+    let isLoading = false;
+
+    function setProgress(p, status) {
+      loaderFill.style.width = Math.min(100, p) + '%';
+      if (status) loaderStatus.textContent = status;
+    }
+
+    LOOKS.forEach(look => {
+      const btn = document.createElement('button');
+      btn.className = 'look-btn';
+      btn.dataset.lookId = look.id;
+      btn.innerHTML = `
+        <span class="num">${String(look.id).padStart(2, '0')}</span>
+        <span>${look.label}</span>
+        <span class="material-tag">${look.material}</span>
+      `;
+      btn.addEventListener('click', () => loadLook(look.id));
+      lookListEl.appendChild(btn);
+    });
+
+    async function loadLook(lookId) {
+      if (isLoading || lookId === currentLookId) return;
+      const look = LOOKS.find(l => l.id === lookId);
+      if (!look) return;
+
+      isLoading = true;
+      document.querySelectorAll('.look-btn').forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.lookId) === lookId);
+      });
+      lookNameEl.textContent = look.label;
+      setProgress(30, `LOADING ${look.label.toUpperCase()}`);
+
+      // Simulate async load
+      await new Promise(r => setTimeout(r, 200));
+
+      try {
+        loadLookInMemory(look, new THREE.Vector3(0, 0.08, 0), 1.0);
+        setProgress(100, 'READY');
+        currentLookId = lookId;
+      } catch (err) {
+        console.error('Failed to load look', look, err);
+        setProgress(0, `ERROR: ${err.message || err}`);
+      } finally {
+        isLoading = false;
+        if (currentLookId !== null) {
+          document.getElementById('loader').classList.add('hidden');
+          document.body.classList.add('loaded');
+        }
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      if (k === 'h') {
+        const ui = document.getElementById('ui');
+        const info = document.getElementById('info');
+        const stats = document.getElementById('stats');
+        const hidden = ui.style.display === 'none';
+        ui.style.display = hidden ? '' : 'none';
+        info.style.display = hidden ? '' : 'none';
+        stats.style.display = hidden ? '' : 'none';
+      } else if (k === 'r') {
+        controls.autoRotate = !controls.autoRotate;
+      } else if (/^[1-5]$/.test(e.key)) {
+        const id = parseInt(e.key);
+        if (LOOKS.find(l => l.id === id)) loadLook(id);
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const fpsEl = document.getElementById('fps');
+    let lastFps = performance.now();
+    let frames = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      loader.update(performance.now() * 0.001);
+      renderer.render(scene, camera);
+      frames++;
+      const now = performance.now();
+      if (now - lastFps > 500) {
+        fpsEl.textContent = Math.round((frames * 1000) / (now - lastFps)) + ' fps';
+        frames = 0;
+        lastFps = now;
+      }
+    }
+
+    setProgress(5, 'BOOTING');
+    loadLook(1).then(() => animate()).catch(err => {
+      console.error(err);
+      showFatalError(err);
+    });
+
+    } catch (err) {
+      console.error(err);
+      showFatalError(err);
+    }
+  </script>
+</body>
+</html>

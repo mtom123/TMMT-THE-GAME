@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TMMT — Atelier Sferico (Web Build)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #0c0a08; color: #d4d0c8;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+    canvas { display: block; }
+
+    /* Loading */
+    #loader {
+      position: fixed; inset: 0;
+      background: #0c0a08;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 100;
+      transition: opacity 0.6s ease;
+    }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+    #loader .title {
+      font-size: 10px; letter-spacing: 0.4em; color: #888;
+      text-transform: uppercase; margin-bottom: 18px; font-weight: 600;
+    }
+    #loader .bar {
+      width: 220px; height: 1px; background: #333;
+      position: relative; overflow: hidden;
+    }
+    #loader .bar-fill {
+      position: absolute; top: 0; left: 0; height: 100%;
+      width: 0%; background: #d4d0c8;
+      transition: width 0.3s ease;
+    }
+    #loader .status {
+      font-size: 9px; color: #555; letter-spacing: 0.15em;
+      margin-top: 14px; text-transform: uppercase; font-weight: 600;
+    }
+
+    /* UI panel */
+    #ui {
+      position: fixed;
+      top: 32px; left: 32px;
+      z-index: 10;
+      max-width: 320px;
+      pointer-events: none;
+    }
+    #ui > * { pointer-events: auto; }
+
+    .brand {
+      font-size: 9px;
+      letter-spacing: 0.4em;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .title {
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      color: #d4d0c8;
+      margin-bottom: 28px;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    .look-list {
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .look-btn {
+      background: transparent;
+      border: 1px solid #2a2622;
+      color: #888;
+      padding: 12px 16px;
+      font-family: inherit;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.18s ease;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-weight: 600;
+    }
+    .look-btn:hover { border-color: #d4d0c8; color: #d4d0c8; background: rgba(255,255,255,0.03); }
+    .look-btn.active { border-color: #d4d0c8; color: #d4d0c8; background: rgba(255,255,255,0.06); }
+    .look-btn .num { font-size: 9px; color: #555; min-width: 20px; }
+    .look-btn.active .num { color: #888; }
+    .look-btn .material-tag {
+      margin-left: auto;
+      font-size: 8px;
+      color: #555;
+      letter-spacing: 0.2em;
+    }
+    .look-btn.active .material-tag { color: #888; }
+
+    /* info */
+    #info {
+      position: fixed;
+      bottom: 32px; left: 32px;
+      font-size: 9px;
+      color: #555;
+      letter-spacing: 0.15em;
+      line-height: 1.8;
+      text-transform: uppercase;
+      font-weight: 600;
+      max-width: 380px;
+    }
+    #info b { color: #d4d0c8; font-weight: 700; }
+
+    #stats {
+      position: fixed;
+      bottom: 32px; right: 32px;
+      font-size: 9px;
+      color: #555;
+      text-align: right;
+      letter-spacing: 0.2em;
+      font-weight: 600;
+      line-height: 1.8;
+    }
+
+    /* Vignette */
+    #vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.45) 100%);
+      z-index: 5;
+    }
+
+    body { opacity: 0; transition: opacity 0.6s ease; }
+    body.loaded { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="loader">
+    <div class="title">TMMT — ATELIER SFERICO</div>
+    <div class="bar"><div class="bar-fill" id="loader-fill"></div></div>
+    <div class="status" id="loader-status">BOOTING</div>
+  </div>
+
+  <div id="ui">
+    <div class="brand">TMMT — Atelier Sferico</div>
+    <div class="title">Lookbook 3D — Web Build</div>
+    <div class="look-list" id="look-list"></div>
+  </div>
+
+  <div id="info">
+    <b>1–5</b> switch look · <b>H</b> hide UI · <b>R</b> toggle auto-rotate · <b>Drag</b> orbit · <b>Scroll</b> zoom
+  </div>
+
+  <div id="stats">
+    <div id="fps">— fps</div>
+    <div id="look-name" style="margin-top:4px;">—</div>
+  </div>
+
+  <div id="vignette"></div>
+  <canvas id="c"></canvas>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { AtelierLoader } from './AtelierLoader.js';
+
+    // ================================================================
+    // TMMT — ATELIER SFERICO (WEB BUILD)
+    // Production loader + UI switch + placeholder GLBs
+    // ================================================================
+
+    // --- Look registry (extends as real GLBs land from the pipeline) ---
+    // Each entry: id (display + hotkey), label, material hint, glbPath
+    // Placeholders are in /assets/placeholders/. When real assets arrive,
+    // swap glbPath to /assets/looks/02-scarf-vest.glb etc.
+    const LOOKS = [
+      { id: 1, label: 'Nylon Test',   material: 'nylon',  glbPath: './assets/placeholders/nylon_test.glb' },
+      { id: 2, label: 'Denim Test',   material: 'denim',  glbPath: './assets/placeholders/denim_test.glb' },
+      { id: 3, label: 'Fur Test',     material: 'fur',    glbPath: './assets/placeholders/fur_test.glb' },
+      { id: 4, label: 'Laser Test',   material: 'laser',  glbPath: './assets/placeholders/laser_test.glb' },
+      { id: 5, label: 'Skin Dummy',   material: 'skin',   glbPath: './assets/placeholders/skin_mannequin.glb' },
+    ];
+
+    // --- Fatal error display ---
+    function showFatalError(msg) {
+      const el = document.createElement('div');
+      el.style.cssText = 'position:fixed;inset:0;background:#1a0000;color:#ff8080;font-family:monospace;font-size:13px;padding:40px;z-index:9999;white-space:pre-wrap;overflow:auto;';
+      el.textContent = 'RUNTIME ERROR:\n\n' + (msg.stack || msg);
+      document.body.appendChild(el);
+      document.getElementById('loader').classList.add('hidden');
+      document.body.classList.add('loaded');
+    }
+
+    try {
+
+    // --- Renderer / scene / camera ---
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x0c0a08);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x0c0a08, 8, 22);
+
+    const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(3.5, 2.8, 5.2);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.target.set(0, 1.2, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 3;
+    controls.maxDistance = 12;
+    controls.minPolarAngle = Math.PI * 0.15;
+    controls.maxPolarAngle = Math.PI * 0.6;
+    controls.enablePan = false;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.6;
+
+    // --- Lighting: 3-point editorial + warm ambient ---
+    const keyLight = new THREE.DirectionalLight(0xfff0d8, 1.4);
+    keyLight.position.set(4, 6, 3);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xb0c4d8, 0.25);
+    fillLight.position.set(-4, 2.5, -2);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffd9a0, 0.5);
+    rimLight.position.set(0, 4, -5);
+    scene.add(rimLight);
+
+    scene.add(new THREE.AmbientLight(0x2a2620, 0.4));
+
+    // --- Floor: simple pedestal ---
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(6, 64),
+      new THREE.MeshBasicMaterial({ color: 0x141210 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    const pedestal = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.4, 1.5, 0.08, 48),
+      new THREE.MeshBasicMaterial({ color: 0x1c1a18 })
+    );
+    pedestal.position.y = 0.04;
+    scene.add(pedestal);
+
+    // Ring on pedestal (subtle anchor)
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(1.4, 1.43, 96),
+      new THREE.MeshBasicMaterial({ color: 0x4a4640, side: THREE.DoubleSide })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.085;
+    scene.add(ring);
+
+    // --- AtelierLoader ---
+    const loader = new AtelierLoader({
+      renderer,
+      scene,
+      lightDir: keyLight.position.clone().normalize(),
+    });
+
+    // --- UI build ---
+    const lookListEl = document.getElementById('look-list');
+    const loaderFill = document.getElementById('loader-fill');
+    const loaderStatus = document.getElementById('loader-status');
+    const lookNameEl = document.getElementById('look-name');
+    let currentLookId = null;
+    let isLoading = false;
+
+    function setProgress(p, status) {
+      loaderFill.style.width = Math.min(100, p) + '%';
+      if (status) loaderStatus.textContent = status;
+    }
+
+    LOOKS.forEach(look => {
+      const btn = document.createElement('button');
+      btn.className = 'look-btn';
+      btn.dataset.lookId = look.id;
+      btn.innerHTML = `
+        <span class="num">${String(look.id).padStart(2, '0')}</span>
+        <span>${look.label}</span>
+        <span class="material-tag">${look.material}</span>
+      `;
+      btn.addEventListener('click', () => loadLook(look.id));
+      lookListEl.appendChild(btn);
+    });
+
+    async function loadLook(lookId) {
+      if (isLoading || lookId === currentLookId) return;
+      const look = LOOKS.find(l => l.id === lookId);
+      if (!look) return;
+
+      isLoading = true;
+      document.querySelectorAll('.look-btn').forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.lookId) === lookId);
+      });
+      lookNameEl.textContent = look.label;
+      setProgress(20, `LOADING ${look.label.toUpperCase()}`);
+
+      try {
+        await loader.loadLook({
+          glbPath: look.glbPath,
+          position: new THREE.Vector3(0, 0.08, 0),
+          scale: 1.0,
+          onProgress: (r) => setProgress(20 + r * 60),
+        });
+        setProgress(100, 'READY');
+        currentLookId = lookId;
+      } catch (err) {
+        console.error('Failed to load look', look, err);
+        setProgress(0, `ERROR: ${err.message || err}`);
+      } finally {
+        isLoading = false;
+        // Hide loader after first successful load
+        if (currentLookId !== null) {
+          document.getElementById('loader').classList.add('hidden');
+          document.body.classList.add('loaded');
+        }
+      }
+    }
+
+    // --- Keyboard controls ---
+    document.addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      if (k === 'h') {
+        const ui = document.getElementById('ui');
+        const info = document.getElementById('info');
+        const stats = document.getElementById('stats');
+        const hidden = ui.style.display === 'none';
+        ui.style.display = hidden ? '' : 'none';
+        info.style.display = hidden ? '' : 'none';
+        stats.style.display = hidden ? '' : 'none';
+      } else if (k === 'r') {
+        controls.autoRotate = !controls.autoRotate;
+      } else if (/^[1-5]$/.test(e.key)) {
+        const id = parseInt(e.key);
+        if (LOOKS.find(l => l.id === id)) loadLook(id);
+      }
+    });
+
+    // --- Resize ---
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- Render loop ---
+    const fpsEl = document.getElementById('fps');
+    let lastFps = performance.now();
+    let frames = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      loader.update(performance.now() * 0.001);
+      renderer.render(scene, camera);
+
+      frames++;
+      const now = performance.now();
+      if (now - lastFps > 500) {
+        fpsEl.textContent = Math.round((frames * 1000) / (now - lastFps)) + ' fps';
+        frames = 0;
+        lastFps = now;
+      }
+    }
+
+    // --- Boot: load first look ---
+    setProgress(5, 'BOOTING');
+    loadLook(1).then(() => {
+      animate();
+    }).catch(err => {
+      console.error(err);
+      showFatalError(err);
+    });
+
+    } catch (err) {
+      console.error(err);
+      showFatalError(err);
+    }
+  </script>
+</body>
+</html>

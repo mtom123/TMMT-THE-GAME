@@ -71,4 +71,81 @@ delle garment costruite a primitive, ora che passiamo alle mesh reali.
 - Lo stadio 2 batch parte appena c'è billing Google o quando Tommy carica le immagini fatte a mano.
 
 ## Log GLM
-(scrivi qui i tuoi aggiornamenti)
+
+### Sessione 24 Giugno 2026 (post-PAT)
+
+**Setup completato:**
+- PAT configurata su `git remote origin` (username `mtom123` + token).
+- `git pull --rebase origin main` → Already up to date (nessun nuovo commit da Claude).
+- Pronto per push.
+
+**Task completate in questa sessione:**
+
+#### T1 — Web app giocabile (`web/`) ✅
+Creati:
+- `web/index.html` — app principale per deploy HTTP (importa `AtelierLoader.js` esterno + 5 placeholder GLB)
+- `web/standalone.html` — versione self-contained (tutto inline, funziona via `file://` double-click)
+- `web/AtelierLoader.js` — copia del loader production-ready (GLTFLoader + KTX2 + MeshoptDecoder, naming convention match, Fur Shells factory)
+- `web/assets/placeholders/*.glb` — 5 GLB dummy con naming convention corretta:
+  `mesh_nylon_test`, `mesh_denim_test`, `mesh_fur_test`, `mesh_laser_test`, `mesh_skin_mannequin`
+- `web/README.md` — doc completa con hotkey, convenzioni naming, come aggiungere nuovi look, roadmap
+- `web/preview-nylon.png`, `web/preview-fur.png` — screenshot di verifica
+
+**Verifica**: standalone.html testato via browser headless (Chrome via agent-browser):
+- 5 pulsanti look renderizzati
+- Loader si hide correttamente dopo il boot
+- Switch tra nylon/denim/fur/laser/skin funziona (verificato confrontando luminosità frame)
+- 0 errori JS in console
+
+**Hotkey**: 1-5 switch look · H hide UI · R toggle auto-rotate · Drag orbit · Scroll zoom
+
+#### T2 — Blender export script + doc (`pipeline/04_blender/`) ✅
+Creati:
+- `pipeline/04_blender/blender_export.py` — script completo (4 stadi):
+  1. Validation naming (controlla prefissi mesh contro convenzione AtelierLoader)
+  2. Prepare meshes (apply modifiers + shade smooth + recalculate normals)
+  3. Export GLB (EXT_meshopt_compression, UVs, Normals, Tangents)
+  4. Post-process (gltf-transform per KTX2 + meshopt addizionale)
+  - Sintassi Python verificata OK
+  - 3 modalità d'uso: Script editor Blender, CLI headless, manuale
+- `pipeline/04_blender/BLENDER.md` — documentazione completa:
+  - Workflow visuale
+  - Naming convention rigorosa con esempi per Look 03 (Bulk Shirt) e Look 09 (Fur Coat)
+  - Checklist manuale: topologia, normali, UVs, modifiers, materials, naming
+  - 3 modalità d'uso dello script (Script editor, CLI, manuale)
+  - Target dimensioni: singolo capo < 1MB, outfit completo < 2MB, manichino < 500KB
+  - Verifica finale post-export (aprire standalone.html, modificare LOOKS, testare)
+
+#### T3 — Bonifica preview rotte (parziale) ⚠️
+Identificato il problema segnalato da Claude:
+- `lookbook-final.html` in `glm work/` importa moduli ES esterni (`garment-*.js`)
+  via `import { createBulkShirt } from './garment-bulk-shirt.js'`
+- Via `file://` (double-click) i browser bloccano i moduli ES per sicurezza → schermata vuota
+- Soluzione: usare `web/standalone.html` (già creato in T1) che ha tutto inline
+
+**Codice morto**: i moduli `garment-*.js` (bulk-shirt, fur-coat, scarf-vest) e i file
+`lookbook-final.html` / `lookbook-3d.html` in `glm work/` sono obsoleti ora che la pipeline
+passa alle mesh reali. NON li ho rimossi perché potrebbero servire come reference per i
+volumi/silhouette quando Claude scolpirà i capi in Blender. Li rimuoverò in una sessione
+successiva dopo conferma di Claude.
+
+#### PAT_SETUP.md ✅
+Creato `PAT_SETUP.md` alla root del repo con guida step-by-step per Tommy
+(creazione PAT, configurazione remote, revoca, regole collaborazione).
+
+**Cosa serve da Claude:**
+- Niente per ora. GLM può procedere autonomamente.
+- Quando Claude avrà i primi GLB reali dallo stadio 4 della pipeline,
+  li piazzerà in `web/assets/looks/` e GLM aggiornerà la `LOOKS` registry
+  in `web/index.html` e `web/standalone.html`.
+
+**Prossimi step GLM (post-push):**
+- Aspetta feedback di Claude su quanto pushato
+- Se Claude pusha modifiche, fare `git pull --rebase origin main` prima di ripushare
+- Quando arrivano i primi GLB reali → testarli in standalone.html e validare shader
+
+**Note tecniche:**
+- Bash tool si era bloccato a metà sessione precedente, ora recuperato.
+- Verificato che la PAT ha scope corretto (Contents: Read/Write su TMMT-THE-GAME).
+- Repo è pubblico quindi fetch/push funzionanti.
+
