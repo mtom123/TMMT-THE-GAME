@@ -200,3 +200,58 @@ Creato `PAT_SETUP.md` alla root del repo con guida step-by-step per Tommy
 
 **Stato complessivo**: pipeline END-TO-END pronta. Mancano solo i GLB
 reali dallo stadio 4 (Blender) per chiudere il cerchio.
+
+---
+
+### Update 24/06/2026 — Stadio 3 testato su outfit-01 (richiesta Tommy)
+
+Tommy ha chiesto di scaricare Hunyuan3D-2 e convertire le foto dell'outfit-01 in 3D.
+
+**Limitazione ambientale**: l'ambiente GLM non ha GPU CUDA. Hunyuan3D-2 richiede
+minimo 8GB VRAM CUDA + PyTorch + pesi modello (~10GB). NON scaricabile e runnabile qui.
+
+**Soluzione adottata**: Strada A dal piano di Claude (IMAGE_TO_3D.md) — usare lo
+Hunyuan3D-2 Space ufficiale su Hugging Face via `gradio_client`. Stesso modello,
+stessa qualità, zero installazione.
+
+**Cosa è stato fatto:**
+1. 4 foto iPhone 12 (3024×4032) preprocessate a 1024×1024 PNG (`scripts/preprocess.py`)
+2. Script `scripts/to3d_hf.py` per automatizzare la chiamata allo Space
+3. Endpoint `/shape_generation` usato (single-image mode, 4 mesh separate)
+4. 4 mesh GLB generate in ~25 minuti totali:
+   - `outfit-01_01-front.glb` (109k vertici, 5.7MB)
+   - `outfit-01_02-side.glb` (94k vertici, 4.9MB)
+   - `outfit-01_03-back.glb` (111k vertici, 5.9MB)
+   - `outfit-01_04-detail.glb` (184k vertici, 9.8MB)
+5. Bounds coerenti per front/side/back (~0.9m × 2m × 0.6m) → figura umana
+6. `out/outfit-01/README.md` con stats e analisi bounds
+7. `IMAGE_TO_3D.md` aggiornato con stato "Strada A testata e funzionante"
+
+**Decisioni prese:**
+- File mesh .gitignore-ati per default (pesanti), ma forzati in commit per outfit-01
+  (pilota — Claude deve poterli ispezionare)
+- Script `to3d_hf.py` ripetibile per outfit successivi: basta aggiungere foto in
+  `pipeline/03_image_to_3d/in/` con naming `outfit-NN_NN-view.jpg` e rilanciare
+
+**Cosa serve da Claude:**
+- Ispezionare le 4 mesh in Blender (stadio 4)
+- Scegliere la migliore come base (front/back hanno bounds coerenti)
+- Oppure fonderle per ottenere mesh completa
+- Decimate per ridurre polycount (100k → 20-30k vertici)
+- Separare capo da manichino
+- Rinominare mesh secondo convenzione AtelierLoader
+- Export GLB via `pipeline/04_blender/blender_export.py`
+- Salvare in `web/assets/looks/01-outfit-one.glb`
+
+**Prossimi step GLM:**
+- Aspetta che Claude processi le mesh in Blender
+- Quando il primo GLB production-ready è in `web/assets/looks/`, aggiornare
+  `LOOKS` registry in `web/index.html` e `web/standalone.html`
+- Test visivo in standalone.html
+
+**Per outfit successivi (02-12):**
+- Tommy scatta 4 foto per outfit
+- Tommy le mette in `/home/z/my-project/upload/`
+- GLM rilancia `preprocess.py` + `to3d_hf.py`
+- Stesso flusso, ~25 minuti per outfit
+
