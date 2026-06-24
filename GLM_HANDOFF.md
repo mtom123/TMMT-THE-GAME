@@ -480,5 +480,89 @@ Tommy ha fatto notare che v1 non preservava i dettagli del capo:
 
 ---
 
+### Update 24/06/2026 — Sessione 5: v3 con POST-PROCESSING PYTHON cel-shaded (FINAL)
+
+Tommy ha segnalato che v2 ancora non preserva i dettagli del capo (camicia):
+- Tasca a caso sul petto che non esiste
+- Spalle senza imbottitura (vedi foto detail)
+- Sides non padded sulla camicia
+- Pantaloni OK (quelli vanno bene)
+
+**Diagnosi:** FLUX-Kontext è generativo → inventa i dettagli anche con prompt espliciti. Non può preservare fedelmente il capo reale.
+
+**Soluzione v3:** post-processing Python CPU-only che applica cel-shaded PRESERVANDO i pixel originali del capo:
+
+1. **Bilateral filter** (d=9, σ=75, 2 iters) — smooth del rumore mantenendo bordi
+2. **Canny edge detection** (low=40, high=120) — estrae TUTTE le linee di costruzione del capo, compresi i quilted stitching lines
+3. **RGB posterize** (10 livelli/channel) — flat color regions
+4. **LAB quantize L a 3 bande** — cel-shading classico (shadow/mid/highlight)
+5. **LAB boost a/b ×1.6** — saturazione vibrante
+6. **Composite Canny edges on top** — outline neri netti su tutti i dettagli
+
+**Vantaggi v3:**
+- ✅ **Nessuna invenzione**: ogni dettaglio proviene dalla foto originale
+- ✅ **CPU-only**: zero quota HF, zero GPU, 3 secondi per immagine
+- ✅ **Free open source**: solo PIL + OpenCV + NumPy (licenze permissive)
+- ✅ **Tunable**: parametri per canny, bands, saturation, edge thickness
+- ✅ **Mesh 4× più dettagliata**: 317k vertici vs 79k di v1
+
+**Asset v3 generati:**
+- `pipeline/02_gamify/scripts/celshade_python.py` — script production-quality (350 righe, CLI-driven)
+- `pipeline/02_gamify/out/outfit-01/01-front-celshaded-v3.png` (102KB) — front con dettagli padded preservati
+- `pipeline/02_gamify/out/outfit-01/01-side-celshaded-v3.png` (89KB)
+- `pipeline/02_gamify/out/outfit-01/01-back-celshaded-v3.png` (95KB)
+- `pipeline/02_gamify/out/outfit-01/01-detail-celshaded-v3.png` (268KB)
+- `pipeline/03_image_to_3d/out/outfit-01/multi-view/avatar-v3-celshaded-python.glb` (14.8MB, 317k vertici, 946k facce)
+
+**Viewer HTML (in download folder):**
+- `avatar-viewer-v3.html` (19.7MB) — v3 high-detail con GLB embedded
+- `comparison-v1-v2-v3.html` — confronto side-by-side di tutte e 3 le versioni
+
+**Modelli confermati free / open source:**
+- **Hunyuan3D-2**: Apache 2.0 (completamente libero)
+- **FLUX.1-Kontext-Dev**: open weights, non-commercial (free per R&D)
+- **PIL/OpenCV/NumPy**: licenze permissive (BSD/MIT)
+- **IDM-VTON** (backup): CC-BY-NC-SA-4.0, preserva garment pixel-perfect
+
+**Pipeline FINALE v3 (production-ready):**
+```
+4 foto iPhone originali
+    ↓ preprocess v2 (padding 1024×1024)
+4 foto padded
+    ↓ Python cel-shaded (CPU, 3 sec/foto)
+4 viste cel-shaded con dettagli capo preservati
+    ↓ Hunyuan3D-2 multi-view (octree=384, steps=50)
+1 mesh GLB 317k vertici
+    ↓ embed base64 in HTML
+Viewer standalone click+drag
+```
+
+**Tempo totale per outfit: ~5 minuti** (vs 30+ minuti di v1/v2 con quota HF)
+
+**Cosa serve a Claude domani (con GPU NVIDIA locale):**
+1. Pullare il repo
+2. Aprire `comparison-v1-v2-v3.html` per confronto visivo
+3. Aprire `avatar-viewer-v3.html` per vedere la mesh 317k vertici
+4. Importare `avatar-v3-celshaded-python.glb` in Blender (stadio 4)
+5. Cleanup: decimate da 317k → 30-50k vertici
+6. Separare capo da manichino
+7. Naming convention (mesh_nylon_*, mesh_denim_*, etc.)
+8. Export GLB via blender_export.py
+9. Salvare in `web/assets/looks/01-outfit-one.glb`
+
+**Per outfit 02-12:**
+- Tommy carica 4 foto in `/home/z/my-project/upload/`
+- GLM lancia `pipeline/02_gamify/scripts/celshade_python.py` su tutte e 4
+- GLM lancia Hunyuan3D-2 (1 chiamata per outfit, 5 minuti)
+- GLM genera viewer HTML
+- ~10 minuti totali per outfit completo
+
+**Token HF da riutilizzare (non committato):**
+- Token HF di Tommy (utente tommasoooo7)
+- Configurato come env var `HF_TOKEN` per script locali
+- Tommy ce lo fornisce di nuovo quando serve
+
+---
+
 
 
