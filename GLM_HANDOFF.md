@@ -757,5 +757,74 @@ Tommy ha chiesto 3 run complete sul nuovo biker outfit overnight, con 3 strategi
 
 ---
 
+### Update 25/06/2026 — Sessione 8: ULTIMO TRY alta definizione (TripoSR mc=256)
+
+Tommy ha chiesto DEFINIZIONE — le RUN precedenti (5k vertici) non erano promuovibili.
+
+**Cosa ho fatto:**
+
+1. **Verificato Hunyuan3D-2**: quota ZeroGPU ancora bloccata per 12 ore. Non disponibile.
+2. **Provato Meshy AI**: richiede API key a pagamento, free tier non disponibile via API.
+3. **Provato Stable Fast 3D via HF Space**: endpoint callable non restituisce mesh, solo UI interactive.
+4. **TripoSR con mc=256 (max)**: riuscito! Mesh ad alta definizione generate:
+   - Front: 22,356 verts, 44,720 faces, 874KB
+   - Side: 22,000+ verts, 44,000+ faces, 896KB
+   - Back: 22,500+ verts, 45,000+ faces, 1MB
+   - 4× più dettaglio delle RUN precedenti (5k → 22k vertici)
+
+**Tool usato:**
+- **TripoSR** (stabilityai, MIT license) installato localmente in `/home/z/my-project/models/triposr/`
+- Patchato per usare PyMCubes (torchmcubes non builda)
+- Patchato per saltare xatlas (UV unwrapping non necessario)
+- mc-resolution=256 (max), chunk-size=8192, CPU puro
+- Tempo: ~30 sec per mesh
+
+**Viewer HTML:**
+- `/home/z/my-project/download/biker-final-viewer.html` (3.6MB) — viewer standalone con:
+  - 3 viste (front/side/back) switchabili via UI o hotkey 1-3
+  - Tutte e 3 le mesh embedded come base64 (file:// compatible)
+  - Auto-rotation X 90° per rendere mesh verticali (TripoSR genera "lie flat")
+  - Click+drag orbita, scroll zoom, W wireframe, A auto-rotate, H hide UI
+
+**Pipeline FINALE v2 (alta definizione):**
+```
+4 foto iPhone originali
+    ↓ preprocess padding 1024×1024
+4 foto padded
+    ↓ TripoSR mc=256 (CPU, 30 sec/mesh)
+3 mesh GLB ~22k vertici ciascuna
+    ↓ embed base64 in HTML (con rotation fix)
+Viewer standalone click+drag, 3 viste switchabili
+```
+
+**Tempo totale: ~3 minuti per outfit** (vs 30+ min precedenti)
+
+**Cosa ho imparato:**
+- TripoSR mc=256 dà 22k vertici — decente ma non ai livelli di Hunyuan3D-2 (200k+)
+- Per vera alta definizione serve Hunyuan3D-2 (quando quota HF si resetta, ~12h)
+- Meshy AI free tier non è API-accessible — solo UI web
+- Stable Fast 3D Space non ha endpoint image-to-3d callable dall'API
+- TripoSR è la migliore alternativa CPU-only free
+
+**Cosa serve a Claude domani (con GPU NVIDIA locale):**
+1. Pullare il repo
+2. Aprire `biker-final-viewer.html` per vedere le mesh ad alta definizione
+3. Con GPU NVIDIA può:
+   - Runnare Hunyuan3D-2 localmente (no quota HF, mesh 200k+ vertici)
+   - Runnare TripoSR con GPU (10× più veloce, mc=512 possibile)
+   - Runnare Stable Fast 3D localmente (modello disponibile su HF)
+4. Per outfit 03-12:
+   - Tommy carica foto in `/home/z/my-project/upload/`
+   - GLM lancia TripoSR mc=256 su tutte le viste
+   - ~3 minuti per outfit completo
+
+**Asset generati:**
+- `pipeline/03_image_to_3d/out/outfit-02/triposr-256-v2/0/mesh.glb` (front, 22k verts, 874KB)
+- `pipeline/03_image_to_3d/out/outfit-02/triposr-256-side/0/mesh.glb` (side, 22k verts, 896KB)
+- `pipeline/03_image_to_3d/out/outfit-02/triposr-256-back/0/mesh.glb` (back, 22k verts, 1MB)
+- `/home/z/my-project/download/biker-final-viewer.html` (3.6MB, embedded GLBs)
+
+---
+
 
 
