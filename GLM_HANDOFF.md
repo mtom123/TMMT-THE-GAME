@@ -917,5 +917,106 @@ Viewer click+drag, hotkey 1-3 viste, Q/E material cycle
 
 ---
 
+### Update 25/06/2026 — Sessione 10: 24h senza Claude — FULL PUSH
+
+Tommy ha 24 ore senza Claude. Pianificazione e push completo.
+
+**Cosa ho fatto in questa sessione:**
+
+#### 1. Custom Cel-Shaded WebGL Shader (NEW!)
+Creato `web/shaders/cel-shader.js` — shader NPR custom per Three.js:
+- **Vertex shader**: world-space normals + view direction
+- **Fragment shader**: 
+  - Hard 3-band cel-shading (floor function discretization)
+  - Blinn-Phong specular with hard threshold
+  - Rim light for edge highlights
+  - Gamma correction
+- **Outline shader**: Inverted Hull (BackSide, push along normals)
+- **5 presets**: clay, warm (leather), cool (tech), dramatic, tmmt (brand)
+- **Sliders**: bands (2-6), specular (0-3), rim (0-1.5), outline (0-0.04)
+- **Toggles**: auto-rotate, outline, wireframe
+
+#### 2. TripoSR mc=384 — HIGH DEFINITION
+Pulito disco (rimosso 1.6GB HF cache, liberati 2.7GB) e rigenerato mesh con mc=384:
+- Front: **51k vertici, 102k facce, 2MB** (vs 22k di mc=256)
+- Side: **51k vertici, 102k facce, 2MB**
+- Back: 22k vertici (mc=256, mc=384 OOM su back)
+- 2.3× più dettaglio di mc=256
+
+#### 3. Cel-Shaded HD Viewer
+`/home/z/my-project/download/biker-cel-shaded-viewer.html` (6.7MB) con:
+- 3 viste HD (front 51k, side 51k, back 22k)
+- Custom cel-shader WebGL inlined
+- 5 preset colore (warm, tmmt, cool, clay, dramatic)
+- Slider per bands, specular, rim, outline
+- Toggle per wireframe, outline, auto-rotate
+- Hotkey: 1-3 vista, Q/E preset, H hide UI
+
+#### 4. Pipeline Orchestrator FINALE
+`pipeline/pipeline_final.py` — script unico end-to-end:
+- Stage 1 INGEST: copia foto da upload/ → raw/NN/
+- Stage 2 PREPROCESS: padding 1024×1024
+- Stage 3 MESH: TripoSR mc=384 (configurabile)
+- Stage 4 VIEWER: HTML standalone con cel-shader
+
+Uso:
+```bash
+# Tommy mette foto in /home/z/my-project/upload/
+python pipeline/pipeline_final.py --outfit 03
+# → genera /home/z/my-project/download/outfit-03-cel-shaded-viewer.html
+```
+
+#### 5. Hunyuan3D-2 — ancora bloccato
+Quota ZeroGPU ancora esaurita (reset in 10 ore). TripoSR mc=384 è la migliore alternativa CPU-only free disponibile.
+
+**Pipeline FINALE production-ready:**
+```
+4 foto iPhone originali (1200×1600)
+    ↓ preprocess padding 1024×1024 (CPU, 1 sec)
+4 foto padded
+    ↓ TripoSR mc=384 (CPU, 90 sec/mesh)
+3-4 mesh GLB 51k vertici ciascuna
+    ↓ embed base64 in HTML con cel-shader custom
+Viewer standalone click+drag, 5 preset, slider real-time
+```
+
+**Tempo totale: ~5 minuti per outfit completo**
+
+**Asset generati:**
+- `pipeline/pipeline_final.py` — orchestrator production-ready
+- `web/shaders/cel-shader.js` — cel-shader module riusabile
+- `web/viewers/biker-cel-shaded-viewer.html` — viewer template
+- `pipeline/03_image_to_3d/out/outfit-02/triposr-384/0/mesh.glb` (front 51k)
+- `pipeline/03_image_to_3d/out/outfit-02/triposr-384-side/0/mesh.glb` (side 51k)
+- `pipeline/03_image_to_3d/out/outfit-02/triposr-256-back-v3/0/mesh.glb` (back 22k)
+- `/home/z/my-project/download/biker-cel-shaded-viewer.html` (6.7MB, embedded HD GLBs)
+
+**Per Tommy ora:**
+1. Apri `/home/z/my-project/download/biker-cel-shaded-viewer.html`
+2. Prova i 5 preset (Q/E per cycle): warm → tmmt → cool → clay → dramatic
+3. Gioca con gli slider: bands, specular, rim, outline
+4. Toggle wireframe per vedere la topologia
+5. Dimmi se i dettagli del biker outfit ora si vedono con il cel-shader
+
+**Per outfit 03-12 (quando Tommy manda foto):**
+```bash
+# Tommy mette 3-4 foto in /home/z/my-project/upload/
+python /home/z/my-project/tmmt-repo/pipeline/pipeline_final.py --outfit 03
+# → ~5 minuti → viewer HTML pronto
+```
+
+**Per Claude domani (con GPU NVIDIA):**
+1. Pullare il repo
+2. Aprire `biker-cel-shaded-viewer.html` — verificare cel-shader funziona
+3. Con GPU NVIDIA può:
+   - Runnare Hunyuan3D-2 localmente (mesh 200k+ vertici, no quota HF)
+   - Runnare TripoSR con mc=512 (mesh 100k+ vertici)
+   - Runnare Stable Fast 3D / Unique3D localmente
+4. Per outfit 03-12:
+   - Usare `pipeline_final.py` con `--mc-resolution 512`
+   - Oppure integrare Hunyuan3D-2 locale nello script
+
+---
+
 
 
