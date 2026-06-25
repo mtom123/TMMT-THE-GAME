@@ -826,5 +826,96 @@ Viewer standalone click+drag, 3 viste switchabili
 
 ---
 
+### Update 25/06/2026 — Sessione 9: 2 METODI SPERIMENTALI (non mollare)
+
+Tommy: "modelo è nero e senza faccia, non si percepiscono dettagli outfit"
+→ il problema era il materiale MeshStandardMaterial scuro.
+
+**METODO SPERIMENTALE 1: Hunyuan3D-2 alternatives con endpoint differenti**
+
+Provato altri 5 image-to-3D HF Spaces sperando in quota pool separato:
+- `flamehaze1115/Wonder3D-demo` → RUNTIME_ERROR
+- `Wuvin/Unique3D` → RUNNING ma ZeroGPU stesso pool (600s quota requested, bloccato)
+- `sudo-ai/zero123plus-demo-space` → RUNTIME_ERROR
+- `pengHTYX/Era3D_MV_demo` → RUNTIME_ERROR (genera solo multiview, non mesh)
+- `multimodalart/Era3D_MV_demo-zerogpu` → RUNNING ma stesso pool ZeroGPU
+- `stabilityai/stable-point-aware-3d` → BUILD_ERROR
+- `stabilityai/stable-virtual-camera` → RUNTIME_ERROR
+- `p4vv37/Stable-zero123` → RUNTIME_ERROR
+
+**Tutti i modelli image-to-3D su HF Spaces condividono lo stesso ZeroGPU quota pool.**
+
+**METODO SPERIMENTALE 2: Viewer con 4 materiali diversi per evidenziare dettagli**
+
+Cambio approccio: la mesh è la stessa (TripoSR 22k vertici) ma il viewer ha 4 modalità material:
+1. **CONTOUR** (default): `MeshStandardMaterial` flat-shaded clay chiaro (0xf0e8d8), roughness 0.3
+   - flatShading=true → ogni triangolo ha normale propria → contour look
+   - 5-point lighting (key + fill + rim + top + bottom) per massima visibilità superficie
+   - Bright pixels: 37k (vs 4-5k dei materiali scuri)
+2. **NORMAL**: `MeshNormalMaterial` rainbow → mostra curvature superficie
+3. **CLAY + WIREFRAME**: dark clay + wireframe overlay verde → mostra topologia
+4. **MATCAP**: matcap procedurale con radial gradient + specular → studio sculpting look
+
+**Pipeline FINALE v3 (experimental viewer):**
+```
+4 foto iPhone originali
+    ↓ preprocess padding 1024×1024
+4 foto padded
+    ↓ TripoSR mc=256 (CPU, 30 sec/mesh)
+3 mesh GLB ~22k vertici ciascuna
+    ↓ embed base64 in HTML (con rotation fix + 4 material modes)
+Viewer click+drag, hotkey 1-3 viste, Q/E material cycle
+```
+
+**Tempo totale: ~3 minuti per outfit**
+
+**Asset generati:**
+- `pipeline/03_image_to_3d/out/outfit-02/triposr-2x/0/mesh.glb` (front 22k, 875KB)
+- `pipeline/03_image_to_3d/out/outfit-02/triposr-2x-side/0/mesh.glb` (side 22k, 896KB)
+- `pipeline/03_image_to_3d/out/outfit-02/triposr-2x-back/0/mesh.glb` (back 22k, 1MB)
+- `/home/z/my-project/download/biker-experimental-viewer.html` (3.6MB, embedded GLBs)
+
+**Spiegazione metodi usati in tutte le sessioni (per Tommy):**
+
+1. **FLUX-Kontext** (v1, v2): text-to-image model che "redraws" la foto in cel-shaded style. Problema: inventa i dettagli del capo invece di preservarli.
+
+2. **Canny + LAB quantize** (v3): post-processing CPU che estrae edge con Canny e quantizza la luminanza in 3 bande. Problema: troppo rumoroso, sembra filtro Instagram.
+
+3. **AnimeGANv2 Kon Satoshi** (v1.1): rete neurale addestrata su fumetti Kon Satoshi via YANGYYYY HF Space. Output pulito ma la foto resta "reale" stilizzata, non vera mesh cartoon.
+
+4. **Python face composite** (v1.1): disegno testa anime stilizzata via PIL sopra le spalle. Soluzione di ripiego per foto senza testa.
+
+5. **z-ai image CLI** (RUN C): text-to-image puro, genera avatar cartoon da zero con prompt descrittivo. Problema: il capo non è identico al reale, è inventato.
+
+6. **Hunyuan3D-2** (outfit 01): image-to-3D migliore sul mercato, mesh 200k+ vertici. Problema: ZeroGPU quota bloccata per 12+ ore su HF Spaces.
+
+7. **TripoSR mc=256** (outfit 02): alternativa CPU-only, mesh 22k vertici. Problema: meno dettaglio di Hunyuan3D-2, mesh "lie flat" richiede rotation fix.
+
+8. **Stable Fast 3D**: HF Space non ha endpoint callable per image-to-3d.
+
+9. **Unique3D, Era3D, Stable-Zero123, Stable-Point-Aware-3D, Stable-Virtual-Camera**: tutti RUNTIME_ERROR o BUILD_ERROR su HF Spaces.
+
+10. **Contour shading viewer** (questa sessione): 4 materiali diversi per mostrare dettagli mesh con illuminazione 5-point. Flat-shaded clay chiaro = contour look che evidenzia ogni triangolo.
+
+**Limiti attuali (onesta):**
+- **Definizione mesh**: 22k vertici TripoSR vs 200k+ Hunyuan3D-2. Per dettagli minuti (singole cuciture quilted) serve Hunyuan3D-2 o GPU locale.
+- **Faccia**: le foto originali croppano la testa. Per averla servirebbe inpainting (FLUX-Kontext) o generazione da zero (z-ai image CLI).
+- **Stile cartoon**: la mesh è RAW (non cartoon). Per mesh cartoon serve: o foto cartoon in input (RUN B/C) o Hunyuan3D-2 con testo condizionamento.
+
+**Cosa serve a Claude domani (con GPU NVIDIA locale):**
+1. Pullare il repo
+2. Aprire `biker-experimental-viewer.html` — provare 4 material modes
+3. Con GPU NVIDIA può:
+   - Runnare Hunyuan3D-2 localmente (no quota HF, mesh 200k+ vertici)
+   - Runnare TripoSR con mc=512 (mesh 100k+ vertici)
+   - Runnare Stable Fast 3D localmente (modello disponibile)
+   - Runnare Unique3D localmente (modello disponibile)
+4. Per outfit 03-12:
+   - Tommy carica foto in `/home/z/my-project/upload/`
+   - GLM lancia TripoSR mc=256 + experimental viewer
+   - ~3 minuti per outfit completo
+
+---
+
 
 
